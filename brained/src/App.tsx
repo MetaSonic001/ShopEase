@@ -37,7 +37,8 @@ function App() {
       <div className="pt-20 w-full">
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<HomePage />} />
+          {/* <Route path="/" element={<LandingPage />} /> */}
           <Route path="/home" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/product/:id" element={<ProductDetail />} />
