@@ -1,16 +1,13 @@
-import Navbar from './Navbar';
 import AboutSection3 from '@/components/ui/about-section';
 
 export default function AboutPage() {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-hidden">
-            <Navbar />
-            <div className="h-20 sm:h-24"></div>
             <AboutSection3 />
 
             {/* Footer */}
             <footer className="bg-gray-900 text-gray-300 py-12 mt-16">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="w-full px-4 sm:px-6 lg:px-8">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                         {/* Company Info */}
                         <div>

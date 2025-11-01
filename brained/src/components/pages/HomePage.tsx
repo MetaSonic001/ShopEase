@@ -75,16 +75,16 @@ function HomePage() {
             <Navbar />
 
             {/* Spacer for fixed navbar */}
-            <div className="h-20 sm:h-24"></div>
+            {/* <div className="h-20 sm:h-24"></div> */}
 
             {/* Banner Section */}
             <Banner />
 
             {/* Products Section */}
             <section className="w-full bg-gray-50 py-20 sm:py-24 lg:py-28">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="w-full px-4 sm:px-6 lg:px-8">
                     {/* Brand blurb */}
-                    <div className="mb-10 text-center max-w-3xl mx-auto">
+                    <div className="mb-10 text-center">
                         <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-2">About ShopEase</h3>
                         <p className="text-base text-gray-600">ShopEase connects customers with carefully curated products from trusted sellers. We focus on simplicity, fast shipping and exceptional customer support.</p>
                     </div>
@@ -176,7 +176,7 @@ function HomePage() {
 
             {/* Special Offers Section */}
             <section className="w-full bg-white py-20 sm:py-24 lg:py-28">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="w-full px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-14">
                         <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3">
                             Special Offers
@@ -236,7 +236,7 @@ function HomePage() {
 
             {/* Footer */}
             <footer className="w-full bg-gray-900 text-gray-300 mt-auto">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+                <div className="w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
                         <div>
                             <h4 className="font-semibold text-white mb-4 text-base sm:text-lg">Shop</h4>

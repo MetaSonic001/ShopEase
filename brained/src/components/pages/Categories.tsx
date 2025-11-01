@@ -21,7 +21,7 @@ export const BentoGrid = ({
   return (
     <div
       className={cn(
-        "mx-auto grid max-w-7xl grid-cols-1 gap-4 md:auto-rows-[18rem] md:grid-cols-3",
+        "grid grid-cols-1 gap-4 md:auto-rows-[18rem] md:grid-cols-3 px-4 sm:px-6 lg:px-8",
         className
       )}
     >
@@ -137,8 +137,8 @@ const items = [
 // Main Category Section Component
 export default function Category() {
   return (
-    <section className="w-full py-20 bg-gray-50 dark:bg-black">
-      <div className="max-w-6xl mx-auto text-center mb-12 px-4">
+    <section className="w-full bg-gray-50 dark:bg-black">
+      <div className="w-full text-center mb-12 px-4 sm:px-6 lg:px-8">
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
           Explore Our Categories
         </h2>
@@ -147,7 +147,7 @@ export default function Category() {
         </p>
       </div>
 
-      <BentoGrid className="max-w-5xl mx-auto">
+      <BentoGrid className="w-full">
         {items.map((item, i) => (
           <BentoGridItem
             key={i}

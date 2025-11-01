@@ -4,7 +4,7 @@ import { Link, Outlet } from 'react-router-dom';
 const AdminLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-4 gap-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-4 gap-6">
         <aside className="col-span-1 bg-white rounded-lg p-4 shadow">
           <h3 className="font-semibold mb-4">Admin</h3>
           <ul className="space-y-2 text-sm">

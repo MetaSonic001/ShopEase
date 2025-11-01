@@ -22,7 +22,7 @@ const Navbar: React.FC = () => {
   try { auth = useAuth(); } catch (e) { auth = null; }
 
   return (
-    <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-md border border-gray-100 z-50 rounded-2xl w-[95%] sm:w-[90%] max-w-6xl">
+    <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-md border border-gray-100 z-50 rounded-2xl w-[95%] sm:w-[98%]">
       <div className="px-4 sm:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}

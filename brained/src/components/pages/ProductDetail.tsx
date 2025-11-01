@@ -149,7 +149,7 @@ export default function ProductDetail() {
                     <nav aria-label="Breadcrumb" className="mb-6">
                         <ol
                             role="list"
-                            className="mx-auto flex max-w-2xl items-center space-x-2 px-4 sm:px-6 lg:max-w-7xl lg:px-8"
+                            className="flex items-center space-x-2 px-4 sm:px-6 lg:px-8"
                         >
                             <li>
                                 <div className="flex items-center">
@@ -193,7 +193,7 @@ export default function ProductDetail() {
                     </nav>
 
                     {/* Image gallery */}
-                    <div className="mx-auto mt-6 max-w-2xl sm:px-6 lg:grid lg:max-w-7xl lg:grid-cols-3 lg:gap-8 lg:px-8">
+                    <div className="mt-6 px-4 sm:px-6 lg:grid lg:grid-cols-3 lg:gap-8 lg:px-8">
                         <img
                             alt={product.images[0].alt}
                             src={product.images[0].src}
@@ -217,7 +217,7 @@ export default function ProductDetail() {
                     </div>
 
                     {/* Product info */}
-                    <div className="mx-auto max-w-2xl px-4 pt-10 pb-16 sm:px-6 lg:grid lg:max-w-7xl lg:grid-cols-3 lg:grid-rows-[auto_auto_1fr] lg:gap-x-8 lg:px-8 lg:pt-16 lg:pb-24">
+                    <div className="px-4 pt-10 pb-16 sm:px-6 lg:grid lg:grid-cols-3 lg:grid-rows-[auto_auto_1fr] lg:gap-x-8 lg:px-8 lg:pt-16 lg:pb-24">
                         <div className="lg:col-span-2 lg:border-r lg:border-gray-200 lg:pr-8">
                             <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
                                 {product.name}

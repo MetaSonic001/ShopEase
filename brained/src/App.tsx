@@ -15,12 +15,12 @@ import Cart from "./components/pages/Cart";
 
 function App() {
   return (
-    <>
+    <div className="w-full">
       {/* Navbar should appear only once */}
       <Navbar />
 
       {/* Add padding to push content below navbar */}
-      <div className="pt-20">
+      <div className="pt-20 w-full">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
@@ -45,7 +45,7 @@ function App() {
           </Route>
         </Routes>
       </div>
-    </>
+    </div>
   );
 }
 

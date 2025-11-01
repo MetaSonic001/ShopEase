@@ -17,12 +17,12 @@ const Banner: React.FC = () => {
 
         {/* Content */}
         <div className="relative z-10 flex items-center justify-center h-full">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="w-full px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
               Quality Products at Great Prices
             </h1>
 
-            <p className="text-lg sm:text-xl md:text-2xl text-gray-200 mb-10 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl md:text-2xl text-gray-200 mb-10 leading-relaxed mx-auto">
               Discover our curated collection of products. Shop with confidence
               and enjoy fast, reliable delivery.
             </p>

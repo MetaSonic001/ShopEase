@@ -38,7 +38,7 @@ export default function AboutSection3() {
     };
     return (
         <section className="py-8 px-4 bg-[#f9f9f9]" ref={heroRef}>
-            <div className="max-w-6xl mx-auto">
+            <div className="w-full px-4 sm:px-6 lg:px-8">
                 <div className="relative">
                     {/* Header with social icons */}
                     <div className="flex justify-between items-center mb-8 w-[85%] absolute lg:top-4 md:top-0 sm:-top-2 -top-3 z-10">
