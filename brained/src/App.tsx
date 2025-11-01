@@ -9,6 +9,8 @@ import RequireAdmin from './components/RequireAdmin';
 import AdminProducts from './pages/Admin/Products';
 import Profile from './pages/Profile';
 import Navbar from './components/pages/Navbar';
+import ProductList from './components/pages/ProductList';
+import Category from './components/pages/Categories';
 
 function App() {
   return (
@@ -28,6 +30,12 @@ function App() {
         </Routes>
       </div>
     </>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/products" element={<ProductList/> } />
+      <Route path="/categories" element={<Category/>} />
+    </Routes>
   );
 }
 

@@ -12,6 +12,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-slot": "^1.2.3",
+    "@tabler/icons-react": "^3.35.0",
     "@tailwindcss/vite": "^4.1.16",
     "axios": "^1.13.1",
     "class-variance-authority": "^0.7.1",
