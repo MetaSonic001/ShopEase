@@ -1,8 +1,10 @@
 import { ShoppingBag } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import Banner from './Banner';
 
 function HomePage() {
+    const navigate = useNavigate();
     // sample products
     const products = [
         {
@@ -76,7 +78,8 @@ function HomePage() {
                         {products.map((product) => (
                             <div
                                 key={product.id}
-                                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 group"
+                                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 group cursor-pointer"
+                                onClick={() => navigate(`/product/${product.id}`)}
                             >
                                 <div className="relative overflow-hidden bg-gray-100">
                                     <img
@@ -94,7 +97,14 @@ function HomePage() {
                                         <span className="text-2xl sm:text-3xl font-bold text-gray-900">
                                             ${product.price}
                                         </span>
-                                        <button className="px-4 sm:px-5 py-2.5 bg-orange-500 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-orange-600 transition whitespace-nowrap shadow-md hover:shadow-lg">
+                                        <button
+                                            className="px-4 sm:px-5 py-2.5 bg-orange-500 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-orange-600 transition whitespace-nowrap shadow-md hover:shadow-lg"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                // TODO: Add to cart functionality
+                                                console.log('Add to cart:', product.id);
+                                            }}
+                                        >
                                             Add to Cart
                                         </button>
                                     </div>
