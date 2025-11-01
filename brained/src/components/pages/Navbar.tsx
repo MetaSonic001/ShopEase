@@ -37,11 +37,10 @@ const Navbar: React.FC = () => {
                 <Link
                   key={link.href}
                   to={link.href}
-                  className={`text-gray-800 hover:text-orange-500 px-4 py-2 text-sm font-medium transition rounded-full ${
-                    activeLink === link.href
+                  className={`text-gray-800 hover:text-orange-500 px-4 py-2 text-sm font-medium transition rounded-full ${activeLink === link.href
                       ? "font-bold text-orange-500 bg-orange-50"
                       : ""
-                  }`}
+                    }`}
                 >
                   {link.label}
                 </Link>
@@ -78,11 +77,10 @@ const Navbar: React.FC = () => {
               <Link
                 key={link.href}
                 to={link.href}
-                className={`block px-3 py-2.5 rounded-lg text-base font-medium transition ${
-                  activeLink === link.href
+                className={`block px-3 py-2.5 rounded-lg text-base font-medium transition ${activeLink === link.href
                     ? "font-bold text-orange-500 bg-orange-50"
                     : "text-gray-800 hover:bg-gray-100"
-                }`}
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 {link.label}
