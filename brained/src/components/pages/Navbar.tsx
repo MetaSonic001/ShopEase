@@ -39,39 +39,39 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Menu */}
           <div className="hidden lg:flex lg:items-center lg:space-x-4">
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={`text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition rounded-md ${activeLink === link.href
-                      ? "font-semibold text-orange-500 bg-orange-50"
-                      : ""
-                    }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <div className="flex items-center gap-3">
-                {auth && auth.user ? (
-                  <>
-                    {auth.user.role === 'admin' && (
-                      <Link to="/admin/products">
-                        <button className="text-sm bg-white border border-gray-200 px-3 py-2 rounded-md text-gray-800 hover:shadow">Admin</button>
-                      </Link>
-                    )}
-                    <Link to="/profile" className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">{(auth.user.name || auth.user.email || 'U').charAt(0).toUpperCase()}</div>
-                      <span className="text-sm font-medium text-gray-800">{auth.user.name || auth.user.email}</span>
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                to={link.href}
+                className={`text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition rounded-md ${activeLink === link.href
+                  ? "font-semibold text-orange-500 bg-orange-50"
+                  : ""
+                  }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="flex items-center gap-3">
+              {auth && auth.user ? (
+                <>
+                  {auth.user.role === 'admin' && (
+                    <Link to="/admin/products">
+                      <button className="text-sm bg-white border border-gray-200 px-3 py-2 rounded-md text-gray-800 hover:shadow">Admin</button>
                     </Link>
-                    <button onClick={async () => { await auth.logout(); }} className="text-sm text-gray-700 bg-gray-100 px-3 py-2 rounded-md hover:bg-gray-200">Logout</button>
-                  </>
-                ) : (
-                  <Link to="/login">
-                    <button className="text-sm bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-md shadow">Sign in</button>
+                  )}
+                  <Link to="/profile" className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">{(auth.user.name || auth.user.email || 'U').charAt(0).toUpperCase()}</div>
+                    <span className="text-sm font-medium text-gray-800">{auth.user.name || auth.user.email}</span>
                   </Link>
-                )}
-              </div>
+                  <button onClick={async () => { await auth.logout(); }} className="text-sm text-gray-700 bg-gray-100 px-3 py-2 rounded-md hover:bg-gray-200">Logout</button>
+                </>
+              ) : (
+                <Link to="/login">
+                  <button className="text-sm bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-md shadow">Sign in</button>
+                </Link>
+              )}
             </div>
+          </div>
 
           {/* Mobile Menu Toggle */}
           <div className="lg:hidden">
@@ -98,8 +98,8 @@ const Navbar: React.FC = () => {
                 key={link.href}
                 to={link.href}
                 className={`block px-3 py-2.5 rounded-lg text-base font-medium transition ${activeLink === link.href
-                    ? "font-bold text-orange-500 bg-orange-50"
-                    : "text-gray-800 hover:bg-gray-100"
+                  ? "font-bold text-orange-500 bg-orange-50"
+                  : "text-gray-800 hover:bg-gray-100"
                   }`}
                 onClick={() => setIsMenuOpen(false)}
               >
