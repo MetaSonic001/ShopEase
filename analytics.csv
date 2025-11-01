@@ -1,0 +1,5 @@
+"type","eventType","element","pageURL","timestamp","deviceInfo","metadata"
+"event","click","#signup","https://example.com/signup","2025-11-01T07:32:23.430Z","{""device"":""unknown"",""browser"":""unknown"",""os"":""unknown""}","{""source"":""test-seed""}"
+"event","scroll","body","https://example.com","2025-11-01T07:32:23.432Z","{""device"":""unknown"",""browser"":""unknown"",""os"":""unknown""}","{""percent"":75}"
+"performance",,,"https://example.com","2025-11-01T07:32:23.486Z","{""device"":""unknown"",""browser"":""unknown"",""os"":""unknown""}",
+"performance",,,"https://example.com/signup","2025-11-01T07:32:23.487Z","{""device"":""unknown"",""browser"":""unknown"",""os"":""unknown""}",
