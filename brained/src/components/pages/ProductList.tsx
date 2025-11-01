@@ -65,6 +65,12 @@ const ProductList: React.FC = () => {
     trackingClient.trackCustomEvent('favorite_toggled', { productId, favorited: willBeFav });
   };
 
+  // useMemo must be called before any conditional returns
+  const filteredProducts = useMemo(() => {
+    if (!categoryFilter) return products;
+    return products.filter(p => (p.category || '').toLowerCase() === categoryFilter.toLowerCase());
+  }, [products, categoryFilter]);
+
   const renderStars = (rating: number) => {
     return (
       <div className="flex items-center gap-1">
@@ -97,11 +103,6 @@ const ProductList: React.FC = () => {
       </div>
     );
   }
-
-  const filteredProducts = useMemo(() => {
-    if (!categoryFilter) return products;
-    return products.filter(p => (p.category || '').toLowerCase() === categoryFilter.toLowerCase());
-  }, [products, categoryFilter]);
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">
