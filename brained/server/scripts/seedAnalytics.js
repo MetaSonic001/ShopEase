@@ -2,10 +2,12 @@
  Seed Funnels, Cohorts, Experiments (and optional sample UserEvents)
 
  Usage (from server/):
-   node scripts/seedAnalytics.js                 # upsert definitions, no deletes
-   node scripts/seedAnalytics.js --reset         # delete Funnels/Cohorts/Experiments then insert
-   node scripts/seedAnalytics.js --with-events   # also seed a small set of sample UserEvents
-   node scripts/seedAnalytics.js --reset --with-events
+   node scripts/seedAnalytics.js                         # upsert definitions, no deletes
+   node scripts/seedAnalytics.js --reset                 # delete Funnels/Cohorts/Experiments then insert
+   node scripts/seedAnalytics.js --with-events           # also seed a small set of sample UserEvents
+   node scripts/seedAnalytics.js --with-analytics        # seed performance metrics & session recordings (heatmaps)
+   node scripts/seedAnalytics.js --reset --with-analytics
+   node scripts/seedAnalytics.js --reset --with-events --with-analytics
 
  Options:
    --project=<id>  # set projectId (default: 'default')
@@ -22,6 +24,8 @@ const Funnel = require('../models/Funnel');
 const Cohort = require('../models/Cohort');
 const Experiment = require('../models/Experiment');
 const UserEvent = require('../models/UserEvent');
+const PerformanceMetrics = require('../models/PerformanceMetrics');
+const SessionRecording = require('../models/SessionRecording');
 
 const log = (...args) => console.log('[seed:analytics]', ...args);
 
@@ -36,6 +40,7 @@ function getArgValue(prefix, defaultValue) {
 const PROJECT_ID = getArgValue('--project', 'default');
 const DO_RESET = getArgFlag('--reset');
 const WITH_EVENTS = getArgFlag('--with-events');
+const WITH_ANALYTICS = getArgFlag('--with-analytics');
 
 // Sample pages used for events
 const PAGES = {
@@ -256,6 +261,98 @@ async function seedEventsSmallSample() {
   }
 }
 
+async function seedPerformanceMetricsSample(count = 200) {
+  const pages = Object.values(PAGES);
+  const devices = [
+    { device: 'desktop', browser: 'Chrome', os: 'Windows' },
+    { device: 'mobile', browser: 'Safari', os: 'iOS' },
+    { device: 'desktop', browser: 'Firefox', os: 'macOS' },
+  ];
+  const docs = [];
+  const now = Date.now();
+  for (let i = 0; i < count; i++) {
+    const pageURL = randomFrom(pages);
+    const device = randomFrom(devices);
+    const timestamp = new Date(now - randInt(1000 * 60 * 60 * 24 * 30)); // last 30 days
+    // realistic-ish metrics
+    const fcp = Math.round(500 + Math.random() * 2000);
+    const lcp = Math.round(fcp + 200 + Math.random() * 1500);
+    const ttfb = Math.round(50 + Math.random() * 400);
+    const cls = parseFloat((Math.random() * 0.25).toFixed(3));
+    const jsErrors = Math.random() < 0.05 ? [{ message: 'TypeError: x is not a function', stack: 'at ...' }] : [];
+    docs.push({ pageURL, FCP: fcp, LCP: lcp, TTFB: ttfb, CLS: cls, jsErrors, timestamp, deviceInfo: device });
+  }
+  if (docs.length) {
+    await PerformanceMetrics.insertMany(docs);
+    log(`Seeded ${docs.length} PerformanceMetrics documents`);
+  }
+}
+
+async function seedSessionRecordingsSample(count = 50) {
+  const pages = Object.values(PAGES);
+  const docs = [];
+  const now = Date.now();
+  for (let i = 0; i < count; i++) {
+    const sessionId = uuidv4();
+    const userId = `user_${Math.ceil(Math.random() * 30)}`;
+    const startTime = new Date(now - randInt(1000 * 60 * 60 * 24 * 14));
+    const duration = Math.round(20 + Math.random() * 300); // seconds
+    const endTime = new Date(startTime.getTime() + duration * 1000);
+    const pagesVisited = [randomFrom(pages), randomFrom(pages)].slice(0, Math.max(1, Math.floor(Math.random() * 3)));
+    const events = [];
+    // generate some movement and click events
+    let t = 0;
+    const totalEvents = 30 + Math.floor(Math.random() * 120);
+    for (let e = 0; e < totalEvents; e++) {
+      const type = Math.random() < 0.1 ? 'click' : 'mousemove';
+      t += Math.round(Math.random() * (duration * 10));
+      if (t > duration * 1000) t = duration * 1000 - 1;
+      const ev = { type, timestamp: t, data: {} };
+      if (type === 'mousemove') {
+        ev.data.x = Math.floor(Math.random() * 1024);
+        ev.data.y = Math.floor(Math.random() * 768);
+      } else if (type === 'click') {
+        ev.data.x = Math.floor(Math.random() * 1024);
+        ev.data.y = Math.floor(Math.random() * 768);
+        ev.data.element = `#el-${Math.ceil(Math.random() * 20)}`;
+      }
+      events.push(ev);
+    }
+    const stats = {
+      totalEvents: events.length,
+      totalClicks: events.filter((x) => x.type === 'click').length,
+      totalScrolls: 0,
+      totalMoves: events.filter((x) => x.type === 'mousemove').length,
+      avgMouseSpeed: parseFloat((Math.random() * 2).toFixed(2)),
+    };
+
+    docs.push({
+      sessionId,
+      userId,
+      projectId: PROJECT_ID,
+      startTime,
+      endTime,
+      duration,
+      entryURL: pagesVisited[0] || PAGES.home,
+      exitURL: pagesVisited[pagesVisited.length - 1] || PAGES.home,
+      pagesVisited,
+      device: { device: randomFrom(['desktop', 'mobile']), browser: randomFrom(['Chrome', 'Safari', 'Firefox']), os: randomFrom(['Windows', 'macOS', 'iOS', 'Android']) },
+      events,
+      snapshots: [],
+      consoleLogs: [],
+      errors: [],
+      stats,
+      hasErrors: false,
+      isComplete: true,
+      tags: [],
+    });
+  }
+  if (docs.length) {
+    await SessionRecording.insertMany(docs);
+    log(`Seeded ${docs.length} SessionRecording documents`);
+  }
+}
+
 async function upsertMany(Model, docs, keyFields) {
   for (const d of docs) {
     const filter = keyFields.reduce((acc, k) => { acc[k] = d[k]; return acc; }, {});
@@ -295,6 +392,16 @@ async function run() {
         log('Cleared existing UserEvents for this project');
       }
       await seedEventsSmallSample();
+    }
+
+    if (WITH_ANALYTICS) {
+      if (DO_RESET) {
+        await PerformanceMetrics.deleteMany({});
+        await SessionRecording.deleteMany({ projectId: PROJECT_ID });
+        log('Cleared PerformanceMetrics and SessionRecording for this project');
+      }
+      await seedPerformanceMetricsSample(300);
+      await seedSessionRecordingsSample(80);
     }
 
     await mongoose.disconnect();
