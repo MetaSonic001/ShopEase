@@ -143,12 +143,12 @@ const SignupPage: React.FC<SignupPageProps> = ({ onNavigateToLogin }) => {
                         'Product page heatmaps',
                         'Conversion funnel insights'
                     ].map((item, index) => (
-                                        <div key={index} className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                                                <Check size={16} className="text-white" strokeWidth={3} />
-                                            </div>
-                                            <span className="text-base text-white">{item}</span>
-                                        </div>
+                        <div key={index} className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                <Check size={16} className="text-white" strokeWidth={3} />
+                            </div>
+                            <span className="text-base text-white">{item}</span>
+                        </div>
                     ))}
                 </div>
 
@@ -292,7 +292,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onNavigateToLogin }) => {
 
                             <button
                                 onClick={handleSignup}
-                                className="w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-3 text-base rounded-lg font-semibold hover:from-orange-500 hover:to-pink-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                                className="w-full bg-gradient-to-r from-orange-400 to-pink-500 text-black py-3 text-base rounded-lg font-semibold hover:from-orange-500 hover:to-pink-600 transition-all duration-200 shadow-md hover:shadow-lg"
                             >
                                 Create account
                             </button>
@@ -338,23 +338,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignup }) => {
     });
     const [showPassword, setShowPassword] = useState(false);
 
-        const navigate = useNavigate();
-        const auth = useAuth();
+    const navigate = useNavigate();
+    const auth = useAuth();
 
-        // Connect to backend - POST /api/auth/login
-        const handleLogin = async (e: React.FormEvent) => {
+    // Connect to backend - POST /api/auth/login
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-                try {
-                    const logged = await auth.login(formData.email, formData.password);
-                    if (logged && (logged as any).role === 'admin') {
-                        navigate('/admin');
-                    } else {
-                        navigate('/');
-                    }
-                } catch (err: any) {
-                    console.error('Login error', err);
-                    alert(err?.response?.data?.message || 'Login failed');
-                }
+        try {
+            const logged = await auth.login(formData.email, formData.password);
+            if (logged && (logged as any).role === 'admin') {
+                navigate('/admin');
+            } else {
+                navigate('/');
+            }
+        } catch (err: any) {
+            console.error('Login error', err);
+            alert(err?.response?.data?.message || 'Login failed');
+        }
     };
 
     const handleDemoAccess = () => {
