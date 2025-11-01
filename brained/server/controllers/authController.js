@@ -24,14 +24,14 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-  // allow creating an admin only when ADMIN_SECRET is provided and matches
-  const requestedRole = req.body.role;
-  const roleToSet = requestedRole === 'admin' && req.body.adminSecret === process.env.ADMIN_SECRET ? 'admin' : 'customer';
+    // allow creating an admin only when ADMIN_SECRET is provided and matches
+    const requestedRole = req.body.role;
+    const roleToSet = requestedRole === 'admin' && req.body.adminSecret === process.env.ADMIN_SECRET ? 'admin' : 'customer';
 
-  const user = await User.create({ name, email, password: hash, role: roleToSet });
+    const user = await User.create({ name, email, password: hash, role: roleToSet });
 
-  const accessToken = createAccessToken(user);
-  const refreshToken = createRefreshToken(user);
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
 
     // save refresh token
     user.refreshTokens.push(refreshToken);
@@ -46,7 +46,7 @@ exports.register = async (req, res) => {
     });
 
     res.status(201).json({ accessToken, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
-    
+
     // Track user registration
     analyticsService.captureEvent(user._id.toString(), null, {
       eventType: 'user_registered',
@@ -65,14 +65,14 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Missing fields' });
 
-  const user = await User.findOne({ email });
+    const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-  const accessToken = createAccessToken(user);
-  const refreshToken = createRefreshToken(user);
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
 
     // store refresh token
     user.refreshTokens.push(refreshToken);
@@ -87,7 +87,7 @@ exports.login = async (req, res) => {
     });
 
     res.json({ accessToken, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
-    
+
     // Track user login
     analyticsService.captureEvent(user._id.toString(), null, {
       eventType: 'user_logged_in',
@@ -113,7 +113,7 @@ exports.refresh = async (req, res) => {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
-  const user = await User.findById(payload.id);
+    const user = await User.findById(payload.id);
     if (!user) return res.status(401).json({ message: 'User not found' });
 
     // check token exists in user's stored tokens
@@ -121,8 +121,8 @@ exports.refresh = async (req, res) => {
       return res.status(401).json({ message: 'Refresh token revoked' });
     }
 
-  // rotate refresh token
-  const newAccessToken = createAccessToken(user);
+    // rotate refresh token
+    const newAccessToken = createAccessToken(user);
     const newRefreshToken = createRefreshToken(user);
 
     // replace old refresh token using atomic operation to prevent version conflicts
@@ -172,7 +172,7 @@ exports.logout = async (req, res) => {
     // clear cookie
     res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
     res.json({ message: 'Logged out' });
-    
+
     // Track user logout
     if (req.userId) {
       analyticsService.captureEvent(req.userId.toString(), null, {
@@ -209,10 +209,10 @@ exports.authorize = (roles = []) => {
       // Extract and verify token
       const auth = req.headers.authorization;
       if (!auth) return res.status(401).json({ message: 'No token' });
-      
+
       const token = auth.split(' ')[1];
       if (!token) return res.status(401).json({ message: 'No token' });
-      
+
       let payload;
       try {
         payload = jwt.verify(token, process.env.JWT_SECRET);
@@ -221,12 +221,12 @@ exports.authorize = (roles = []) => {
       } catch (e) {
         return res.status(401).json({ message: 'Invalid or expired token' });
       }
-      
+
       // Check user exists and has required role
       const user = await User.findById(req.userId);
       if (!user) return res.status(401).json({ message: 'User not found' });
       if (!roles.includes(user.role)) return res.status(403).json({ message: 'Forbidden: Admin access required' });
-      
+
       next();
     } catch (err) {
       console.error(err);

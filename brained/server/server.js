@@ -121,7 +121,7 @@ app.get('/pagepulse.js', (req, res) => {
   const fs = require('fs');
   const path = require('path');
   const scriptPath = path.join(__dirname, '../public/pagepulse.js');
-  
+
   if (fs.existsSync(scriptPath)) {
     res.sendFile(scriptPath);
   } else {

@@ -16,7 +16,7 @@ const userEventSchema = new mongoose.Schema({
     default: 'default',
     index: true,
   },
-  
+
   // Event data
   eventType: {
     type: String,
@@ -28,7 +28,7 @@ const userEventSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  
+
   // Page context
   pageURL: {
     type: String,
@@ -37,10 +37,10 @@ const userEventSchema = new mongoose.Schema({
   },
   pageTitle: String,
   referrer: String,
-  
+
   // Event metadata - using Mixed type to handle flexible data structures
   metadata: mongoose.Schema.Types.Mixed,
-  
+
   // Device & browser info
   device: {
     device: String, // desktop, mobile, tablet
@@ -50,7 +50,7 @@ const userEventSchema = new mongoose.Schema({
     viewport: String,
     raw: mongoose.Schema.Types.Mixed,
   },
-  
+
   // Location
   location: {
     country: String,
@@ -58,7 +58,7 @@ const userEventSchema = new mongoose.Schema({
     region: String,
     ip: String,
   },
-  
+
   // Timing
   timestamp: {
     type: Date,
@@ -66,7 +66,7 @@ const userEventSchema = new mongoose.Schema({
     default: Date.now,
     index: true,
   },
-  
+
   // Super properties (persistent user-level data)
   superProperties: {
     userPlan: String,
