@@ -32,28 +32,28 @@ const Navbar: React.FC = () => {
   try { auth = useAuth(); } catch (e) { auth = null; }
 
   return (
-    <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-md border border-gray-100 z-50 rounded-2xl w-[60%]">
-      <div className="px-4 sm:px-8">
-        <div className="flex items-center justify-between h-16">
+    <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-md border border-gray-100 z-50 rounded-2xl w-[95%] max-w-7xl">
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-3">
+          <div className="flex items-center shrink-0">
+            <Link to="/" className="flex items-center space-x-2">
               <div className="w-9 h-9 bg-linear-to-br from-orange-400 to-pink-500 rounded-md flex items-center justify-center shadow">
                 <ShoppingBag className="h-5 w-5 text-white" />
               </div>
-              <span className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">
+              <span className="hidden sm:block text-lg font-bold text-gray-900 tracking-tight">
                 ShopEase
               </span>
             </Link>
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden lg:flex lg:items-center lg:space-x-4">
+          <div className="hidden lg:flex lg:items-center lg:gap-2 lg:flex-1 lg:justify-end">
             {links.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
-                className={`text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition rounded-md ${activeLink === link.href
+                className={`text-gray-700 hover:text-orange-500 px-2 xl:px-3 py-2 text-sm font-medium transition rounded-md whitespace-nowrap ${activeLink === link.href
                   ? "font-semibold text-orange-500 bg-orange-50"
                   : ""
                   }`}
@@ -61,29 +61,29 @@ const Navbar: React.FC = () => {
                 {link.label}
               </Link>
             ))}
-            <form onSubmit={onSearchSubmit} className="ml-2">
+            <form onSubmit={onSearchSubmit} className="ml-1">
               <input
                 type="search"
                 placeholder="Search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="px-3 py-2 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-32 xl:w-40 px-3 py-2 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 aria-label="Search products"
               />
             </form>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 ml-2">
               {auth && auth.user ? (
                 <>
                   {auth.user.role === 'admin' && (
                     <Link to="/admin/products">
-                      <button className="text-sm bg-white border border-gray-200 px-3 py-2 rounded-md text-gray-800 hover:shadow">Admin</button>
+                      <button className="text-xs xl:text-sm bg-white border border-gray-200 px-2 xl:px-3 py-1.5 xl:py-2 rounded-md text-gray-800 hover:shadow whitespace-nowrap">Admin</button>
                     </Link>
                   )}
-                  <Link to="/profile" className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">{(auth.user.name || auth.user.email || 'U').charAt(0).toUpperCase()}</div>
-                    <span className="text-sm font-medium text-gray-800">{auth.user.name || auth.user.email}</span>
+                  <Link to="/profile" className="flex items-center gap-1.5">
+                    <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold shrink-0">{(auth.user.name || auth.user.email || 'U').charAt(0).toUpperCase()}</div>
+                    <span className="hidden xl:block text-sm font-medium text-gray-800 max-w-[120px] truncate">{auth.user.name || auth.user.email}</span>
                   </Link>
-                  <button onClick={async () => { await auth.logout(); }} className="text-sm text-gray-700 bg-gray-100 px-3 py-2 rounded-md hover:bg-gray-200">Logout</button>
+                  <button onClick={async () => { await auth.logout(); }} className="text-xs xl:text-sm text-gray-700 bg-gray-100 px-2 xl:px-3 py-1.5 xl:py-2 rounded-md hover:bg-gray-200 whitespace-nowrap">Logout</button>
                 </>
               ) : (
                 <Link to="/login">
