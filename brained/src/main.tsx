@@ -4,7 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
-import Navbar from './components/pages/Navbar.tsx'
 import trackingClient from './services/trackingClient'
 import ConsentBanner from './components/ConsentBanner'
 
