@@ -6,8 +6,8 @@ exports.createProduct = async (req, res) => {
     // simple create; require authentication
     // You may add role checks here later
     if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
-    const { title, description, price, image, category, featured } = req.body;
-    const p = await Product.create({ title, description, price, image, category, featured });
+    const productData = req.body;
+    const p = await Product.create(productData);
     res.status(201).json(p);
   } catch (err) {
     console.error(err);
@@ -19,6 +19,18 @@ exports.getProducts = async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 }).limit(100);
     res.json(products);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findById(id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json(product);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

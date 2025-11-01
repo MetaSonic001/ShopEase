@@ -4,22 +4,45 @@ const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 const EventAnalytics = require('../models/EventAnalytics');
 const PerformanceMetrics = require('../models/PerformanceMetrics');
-const posthog = require('../services/posthogClient');
+const analyticsService = require('../services/analyticsService');
+const AppSettings = require('../models/AppSettings');
+const { authenticate, authorize } = require('../controllers/authController');
+
+// sanitize incoming metadata to avoid storing sensitive info
+function sanitize(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const SENSITIVE_KEYS = ['password', 'pwd', 'creditcard', 'cc', 'ssn', 'token', 'auth', 'authorization', 'value'];
+  const out = Array.isArray(obj) ? [] : {};
+  for (const k of Object.keys(obj)) {
+    if (SENSITIVE_KEYS.includes(k.toLowerCase())) continue;
+    const v = obj[k];
+    out[k] = typeof v === 'object' ? sanitize(v) : v;
+  }
+  return out;
+}
 
 // POST /api/analytics/events
 router.post('/events', async (req, res) => {
   try {
-    const { eventType, element, pageURL, timestamp, metadata } = req.body;
+    const { eventType, element, pageURL, timestamp, metadata, sessionId, userId } = req.body;
     // prefer deviceInfo from middleware (parsed UA) but allow client-supplied deviceInfo
     const deviceInfo = req.deviceInfo || req.body.deviceInfo;
-    const doc = await EventAnalytics.create({ eventType, element, pageURL, timestamp, deviceInfo, metadata });
-    // capture to PostHog (best-effort)
-    try {
-      const distinctId = req.userId || req.body.userId || req.ip || 'anonymous';
-      posthog.capture(distinctId, eventType || 'event', { element, pageURL, timestamp, metadata, deviceInfo });
-    } catch (e) {
-      // swallow
-    }
+    const cleanMeta = sanitize(metadata || {});
+    
+    // Save to EventAnalytics (legacy model)
+    const doc = await EventAnalytics.create({ eventType, element, pageURL, timestamp, deviceInfo, metadata: cleanMeta });
+    
+    // Also capture to our custom analytics service
+    const distinctId = userId || req.userId || req.ip || 'anonymous';
+    analyticsService.captureEvent(distinctId, sessionId, {
+      eventType,
+      eventName: eventType,
+      pageURL,
+      metadata: cleanMeta,
+      device: deviceInfo,
+      projectId: 'default',
+    }).catch(e => console.error('Analytics service error:', e));
+    
     res.status(201).json(doc);
   } catch (err) {
     console.error(err);
@@ -85,13 +108,26 @@ router.get('/seed', async (req, res) => {
 // POST /api/analytics/performance
 router.post('/performance', async (req, res) => {
   try {
-    const { pageURL, TTFB, LCP, FCP, CLS, jsErrors, timestamp } = req.body;
+    const { pageURL, TTFB, LCP, FCP, CLS, jsErrors, timestamp, sessionId } = req.body;
     const deviceInfo = req.deviceInfo || req.body.deviceInfo;
     const doc = await PerformanceMetrics.create({ pageURL, TTFB, LCP, FCP, CLS, jsErrors, timestamp, deviceInfo });
-    try {
-      const distinctId = req.userId || req.body.userId || req.ip || 'anonymous';
-      posthog.capture(distinctId, 'performance', { pageURL, TTFB, LCP, FCP, CLS, jsErrors, timestamp, deviceInfo });
-    } catch (e) {}
+    
+    // Track performance metrics with custom analytics
+    const userId = req.userId || req.body.userId || 'anonymous';
+    await analyticsService.captureEvent(userId, sessionId, {
+      eventType: 'performance',
+      eventName: 'performance_metrics',
+      pageURL,
+      metadata: {
+        TTFB,
+        LCP,
+        FCP,
+        CLS,
+        jsErrors,
+        timestamp
+      }
+    });
+    
     res.status(201).json(doc);
   } catch (err) {
     console.error(err);
@@ -99,10 +135,18 @@ router.post('/performance', async (req, res) => {
   }
 });
 
-// GET /api/analytics/events
+// GET /api/analytics/events (supports ?from=ISO&to=ISO&pageURL=/path)
 router.get('/events', async (req, res) => {
   try {
-    const items = await EventAnalytics.find().sort({ timestamp: -1 }).lean();
+    const { from, to, pageURL } = req.query;
+    const query = {};
+    if (from || to) {
+      query.timestamp = {};
+      if (from) query.timestamp.$gte = new Date(from);
+      if (to) query.timestamp.$lte = new Date(to);
+    }
+    if (pageURL) query.pageURL = pageURL;
+    const items = await EventAnalytics.find(query).sort({ timestamp: -1 }).lean();
     res.json(items);
   } catch (err) {
     console.error(err);
@@ -113,14 +157,24 @@ router.get('/events', async (req, res) => {
 // GET /api/analytics/events/summary
 router.get('/events/summary', async (req, res) => {
   try {
+    const { from, to, pageURL } = req.query;
+    const match = {};
+    if (from || to) {
+      match.timestamp = {};
+      if (from) match.timestamp.$gte = new Date(from);
+      if (to) match.timestamp.$lte = new Date(to);
+    }
+    if (pageURL) match.pageURL = pageURL;
     // counts by event type
     const byType = await EventAnalytics.aggregate([
+      { $match: match },
       { $group: { _id: '$eventType', count: { $sum: 1 } } },
       { $project: { _id: 0, eventType: '$_id', count: 1 } }
     ]);
 
     // counts by pageURL and eventType
     const byPageAndType = await EventAnalytics.aggregate([
+      { $match: match },
       { $group: { _id: { pageURL: '$pageURL', eventType: '$eventType' }, count: { $sum: 1 } } },
       { $project: { _id: 0, pageURL: '$_id.pageURL', eventType: '$_id.eventType', count: 1 } }
     ]);
@@ -135,7 +189,15 @@ router.get('/events/summary', async (req, res) => {
 // GET /api/analytics/performance
 router.get('/performance', async (req, res) => {
   try {
-    const items = await PerformanceMetrics.find().sort({ timestamp: -1 }).lean();
+    const { from, to, pageURL } = req.query;
+    const query = {};
+    if (from || to) {
+      query.timestamp = {};
+      if (from) query.timestamp.$gte = new Date(from);
+      if (to) query.timestamp.$lte = new Date(to);
+    }
+    if (pageURL) query.pageURL = pageURL;
+    const items = await PerformanceMetrics.find(query).sort({ timestamp: -1 }).lean();
     res.json(items);
   } catch (err) {
     console.error(err);
@@ -146,8 +208,17 @@ router.get('/performance', async (req, res) => {
 // GET /api/analytics/performance/summary
 router.get('/performance/summary', async (req, res) => {
   try {
+    const { from, to, pageURL } = req.query;
+    const match = {};
+    if (from || to) {
+      match.timestamp = {};
+      if (from) match.timestamp.$gte = new Date(from);
+      if (to) match.timestamp.$lte = new Date(to);
+    }
+    if (pageURL) match.pageURL = pageURL;
     // average metrics grouped by pageURL
     const agg = await PerformanceMetrics.aggregate([
+      { $match: match },
       { $group: {
           _id: '$pageURL',
           avgTTFB: { $avg: '$TTFB' },
@@ -251,6 +322,127 @@ router.get('/export/pdf', async (req, res) => {
   }
 });
 
+// POST /api/analytics/recording-events - Capture recording events
+router.post('/recording-events', async (req, res) => {
+  try {
+    const { sessionId, events } = req.body;
+    if (!sessionId || !events || !Array.isArray(events)) {
+      return res.status(400).json({ message: 'sessionId and events array required' });
+    }
+
+    // Add events to session recording
+    for (const event of events) {
+      await analyticsService.captureRecordingEvent(sessionId, event);
+    }
+
+    res.json({ success: true, eventsProcessed: events.length });
+  } catch (err) {
+    console.error('Failed to capture recording events', err);
+    res.status(500).json({ message: 'Failed to capture recording events' });
+  }
+});
+
+// POST /api/analytics/snapshot - Capture DOM snapshot
+router.post('/snapshot', async (req, res) => {
+  try {
+    const { sessionId, snapshot } = req.body;
+    if (!sessionId || !snapshot) {
+      return res.status(400).json({ message: 'sessionId and snapshot required' });
+    }
+
+    await analyticsService.addSnapshot(sessionId, snapshot);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to capture snapshot', err);
+    res.status(500).json({ message: 'Failed to capture snapshot' });
+  }
+});
+
+// POST /api/analytics/console - Capture console log
+router.post('/console', async (req, res) => {
+  try {
+    const { sessionId, log } = req.body;
+    if (!sessionId || !log) {
+      return res.status(400).json({ message: 'sessionId and log required' });
+    }
+
+    await analyticsService.addConsoleLog(sessionId, log);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to capture console log', err);
+    res.status(500).json({ message: 'Failed to capture console log' });
+  }
+});
+
+// POST /api/analytics/identify - Identify user
+router.post('/identify', async (req, res) => {
+  try {
+    const { userId, properties } = req.body;
+    if (!userId) {
+      return res.status(400).json({ message: 'userId required' });
+    }
+
+    await analyticsService.identifyUser(userId, properties);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to identify user', err);
+    res.status(500).json({ message: 'Failed to identify user' });
+  }
+});
+
+// GET /api/analytics/recordings - List session recordings
+router.get('/recordings', authenticate, authorize(['admin']), async (req, res) => {
+  try {
+    const { projectId = 'default', limit = 50, hasErrors, userId } = req.query;
+    
+    const options = {
+      limit: parseInt(limit),
+      hasErrors: hasErrors === 'true',
+      userId: userId || undefined
+    };
+
+    const recordings = await analyticsService.listRecordings(projectId, options);
+    res.json({ recordings });
+  } catch (err) {
+    console.error('Failed to list recordings', err);
+    res.status(500).json({ message: 'Failed to list recordings' });
+  }
+});
+
+// GET /api/analytics/recordings/:sessionId - Get session recording
+router.get('/recordings/:sessionId', authenticate, authorize(['admin']), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const recording = await analyticsService.getSessionRecording(sessionId);
+    
+    if (!recording) {
+      return res.status(404).json({ message: 'Recording not found' });
+    }
+
+    res.json({ recording });
+  } catch (err) {
+    console.error('Failed to get recording', err);
+    res.status(500).json({ message: 'Failed to get recording' });
+  }
+});
+
+// GET /api/analytics/heatmap - Get heatmap data
+router.get('/heatmap', authenticate, authorize(['admin']), async (req, res) => {
+  try {
+    const { projectId = 'default', pageURL, eventType = 'click' } = req.query;
+    
+    if (!pageURL) {
+      return res.status(400).json({ message: 'pageURL required' });
+    }
+
+    const heatmapData = await analyticsService.getHeatmapData(projectId, pageURL, eventType);
+    res.json({ heatmapData });
+  } catch (err) {
+    console.error('Failed to get heatmap data', err);
+    res.status(500).json({ message: 'Failed to get heatmap data' });
+  }
+});
+
 module.exports = router;
 
 // Integration endpoints (stubs) for external analytics tools
@@ -272,4 +464,29 @@ router.post('/integrations/custom', async (req, res) => {
   // Allow consumers to register or forward events to custom listeners.
   console.log('Custom integration stub received', req.body);
   res.json({ message: 'Custom integration stub received' });
+});
+
+// Global recording toggle
+router.get('/recording', async (req, res) => {
+  try {
+    const doc = await AppSettings.findOne({ key: 'global' });
+    res.json({ enabled: !!(doc && doc.recordingEnabled) });
+  } catch (e) {
+    res.status(500).json({ message: 'Failed to get recording flag' });
+  }
+});
+
+router.post('/recording', authenticate, authorize(['admin']), async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const doc = await AppSettings.findOneAndUpdate(
+      { key: 'global' },
+      { $set: { recordingEnabled: !!enabled } },
+      { upsert: true, new: true }
+    );
+    res.json({ enabled: doc.recordingEnabled });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Failed to set recording flag' });
+  }
 });

@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const analyticsService = require('../services/analyticsService');
 
 // Token helpers
 const createAccessToken = (user) => {
@@ -45,6 +46,14 @@ exports.register = async (req, res) => {
     });
 
     res.status(201).json({ accessToken, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    
+    // Track user registration
+    analyticsService.captureEvent(user._id.toString(), null, {
+      eventType: 'user_registered',
+      eventName: 'User Registered',
+      pageURL: req.headers.referer || '/register',
+      metadata: { email: user.email, role: user.role },
+    }).catch(e => console.error('Analytics error:', e));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -78,6 +87,14 @@ exports.login = async (req, res) => {
     });
 
     res.json({ accessToken, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    
+    // Track user login
+    analyticsService.captureEvent(user._id.toString(), null, {
+      eventType: 'user_logged_in',
+      eventName: 'User Logged In',
+      pageURL: req.headers.referer || '/login',
+      metadata: { email: user.email, role: user.role },
+    }).catch(e => console.error('Analytics error:', e));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -146,6 +163,15 @@ exports.logout = async (req, res) => {
     // clear cookie
     res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
     res.json({ message: 'Logged out' });
+    
+    // Track user logout
+    if (req.userId) {
+      analyticsService.captureEvent(req.userId.toString(), null, {
+        eventType: 'user_logged_out',
+        eventName: 'User Logged Out',
+        pageURL: req.headers.referer || '/logout',
+      }).catch(e => console.error('Analytics error:', e));
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

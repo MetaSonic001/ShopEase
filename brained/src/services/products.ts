@@ -5,6 +5,11 @@ export const getProducts = async () => {
   return res.data;
 };
 
+export const getProductById = async (id: string) => {
+  const res = await api.get(`/api/products/${id}`);
+  return res.data;
+};
+
 export const getFeatured = async (limit = 5) => {
   const res = await api.get('/api/products/featured', { params: { limit } });
   return res.data;

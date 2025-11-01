@@ -24,8 +24,9 @@
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.0",
     "pdfkit": "^0.13.0",
+    "socket.io": "^4.8.1",
     "ua-parser-js": "^1.0.37",
-    "posthog-node": "^2.0.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
