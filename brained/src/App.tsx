@@ -125,9 +125,9 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-success" element={<OrderSuccess />} />
-            <Route path="analytics2" element={<Analytics2/>} />
-            <Route path="Overview2" element={<RealTimeAnalyticsDashboard2 />} />
-            <Route path="FunnelAnalysis2" element={<FunnelAnalysis2 />} />
+            <Route path="/analytics2" element={<Analytics2 />} />
+            <Route path="/Overview2" element={<RealTimeAnalyticsDashboard2 />} />
+            <Route path="/FunnelAnalysis2" element={<FunnelAnalysis2 />} />
             {/* Analytics pages (top-level paths as requested) */}
             <Route path="/analytics/activity" element={<ActivityFeed />} />
             <Route path="/analytics/people" element={<PeopleTab />} />
