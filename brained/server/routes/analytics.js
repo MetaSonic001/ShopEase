@@ -4,6 +4,8 @@ const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 const EventAnalytics = require('../models/EventAnalytics');
 const PerformanceMetrics = require('../models/PerformanceMetrics');
+const SessionRecording = require('../models/SessionRecording');
+const UserInteraction = require('../models/UserInteraction');
 const analyticsService = require('../services/analyticsService');
 const AppSettings = require('../models/AppSettings');
 const { authenticate, authorize } = require('../controllers/authController');
@@ -132,6 +134,115 @@ router.post('/performance', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to save performance metrics' });
+  }
+});
+
+// POST /api/analytics/track
+// Accepts either a single event or { events: [...] } and stores in UserInteraction
+router.post('/track', async (req, res) => {
+  try {
+    const payload = req.body?.events && Array.isArray(req.body.events) ? req.body.events : [req.body];
+
+    const docs = payload
+      .filter(Boolean)
+      .map((i) => ({
+        sessionId: i.sessionId,
+        userId: i.userId || 'anonymous',
+        projectId: i.projectId || 'default',
+        eventType: i.eventType || i.event || 'custom',
+        eventName: i.eventName || i.eventType || i.event || 'custom',
+        pageURL: i.pageURL || i.url,
+        pageTitle: i.metadata?.pageTitle,
+        referrer: i.metadata?.referrer,
+        metadata: sanitize(i.metadata || i.properties || {}),
+        timestamp: i.timestamp ? new Date(i.timestamp) : new Date(),
+      }));
+
+    if (docs.length === 0) {
+      return res.status(400).json({ message: 'No events to track' });
+    }
+
+    await UserInteraction.insertMany(docs);
+    res.json({ message: 'Tracked', count: docs.length });
+  } catch (err) {
+    console.error('Error in /analytics/track:', err);
+    res.status(500).json({ message: 'Failed to track events' });
+  }
+});
+
+// POST /api/analytics/session
+// Alias for recording rrweb session chunks
+router.post('/session', async (req, res) => {
+  try {
+    const { sessionId, userId, events, consoleLogs, networkRequests, metadata, projectId } = req.body;
+
+    if (!sessionId || !events || !Array.isArray(events)) {
+      return res.status(400).json({ message: 'sessionId and events array are required' });
+    }
+
+    let session = await SessionRecording.findOne({ sessionId });
+    if (!session) {
+      session = new SessionRecording({
+        sessionId,
+        userId: userId || 'anonymous',
+        projectId: projectId || 'default',
+        startTime: new Date(),
+        events: [],
+        consoleLogs: [],
+        networkRequests: [],
+        device: metadata?.device || {},
+        entryURL: metadata?.url || '',
+        pagesVisited: metadata?.url ? [metadata?.url] : [],
+      });
+    }
+
+    session.events.push(...events);
+    if (consoleLogs && Array.isArray(consoleLogs)) session.consoleLogs.push(...consoleLogs);
+    if (networkRequests && Array.isArray(networkRequests)) session.networkRequests.push(...networkRequests);
+
+    if (metadata) {
+      if (metadata.url && !session.pagesVisited.includes(metadata.url)) {
+        session.pagesVisited.push(metadata.url);
+        session.exitURL = metadata.url;
+      }
+      if (metadata.device) session.device = { ...session.device, ...metadata.device };
+    }
+
+    // Update basic stats
+    session.stats = session.stats || {};
+    session.stats.totalEvents = (session.stats.totalEvents || 0) + events.length;
+
+    await session.save();
+    res.json({ message: 'Session events recorded', sessionId: session.sessionId });
+  } catch (err) {
+    console.error('Error in /analytics/session:', err);
+    res.status(500).json({ message: 'Failed to record session' });
+  }
+});
+
+// GET /api/analytics/dashboard
+// Returns aggregated stats for admin
+router.get('/dashboard', async (req, res) => {
+  try {
+    const [sessions, interactions, heatmapData] = await Promise.all([
+      SessionRecording.countDocuments(),
+      UserInteraction.countDocuments(),
+      require('../models/HeatmapData').countDocuments(),
+    ]);
+
+    // Events by type (last 7 days)
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const byType = await UserInteraction.aggregate([
+      { $match: { timestamp: { $gte: since } } },
+      { $group: { _id: '$eventType', count: { $sum: 1 } } },
+      { $project: { _id: 0, eventType: '$_id', count: 1 } },
+      { $sort: { count: -1 } },
+    ]);
+
+    res.json({ stats: { sessions, interactions, heatmapData }, byType });
+  } catch (err) {
+    console.error('Error in /analytics/dashboard:', err);
+    res.status(500).json({ message: 'Failed to fetch dashboard data' });
   }
 });
 

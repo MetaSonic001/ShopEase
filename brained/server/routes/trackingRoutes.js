@@ -9,7 +9,7 @@ const UserInteraction = require('../models/UserInteraction');
 // Create or update session recording with rrweb events
 router.post('/session', async (req, res) => {
   try {
-    const { sessionId, userId, events, metadata } = req.body;
+    const { sessionId, userId, events, consoleLogs, networkRequests, metadata } = req.body;
 
     if (!sessionId || !events || !Array.isArray(events)) {
       return res.status(400).json({ message: 'sessionId and events array are required' });
@@ -25,6 +25,8 @@ router.post('/session', async (req, res) => {
         projectId: req.body.projectId || 'default',
         startTime: new Date(),
         events: [],
+        consoleLogs: [],
+        networkRequests: [],
         device: metadata?.device || {},
         entryURL: metadata?.url || '',
         pagesVisited: metadata?.url ? [metadata?.url] : [],
@@ -33,6 +35,16 @@ router.post('/session', async (req, res) => {
 
     // Add events to session
     session.events.push(...events);
+
+    // Add console logs
+    if (consoleLogs && Array.isArray(consoleLogs)) {
+      session.consoleLogs.push(...consoleLogs);
+    }
+
+    // Add network requests
+    if (networkRequests && Array.isArray(networkRequests)) {
+      session.networkRequests.push(...networkRequests);
+    }
 
     // Update metadata
     if (metadata) {
@@ -46,9 +58,9 @@ router.post('/session', async (req, res) => {
     }
 
     // Update stats
-    const clickEvents = events.filter((e) => e.type === 'click').length;
+    const clickEvents = events.filter((e) => e.type === 'click' || e.type === 3).length;
     const scrollEvents = events.filter((e) => e.type === 'scroll').length;
-    const inputEvents = events.filter((e) => e.type === 'input').length;
+    const inputEvents = events.filter((e) => e.type === 'input' || e.type === 5).length;
 
     session.stats = session.stats || {};
     session.stats.totalEvents = (session.stats.totalEvents || 0) + events.length;
@@ -86,6 +98,30 @@ router.post('/session/:sessionId/complete', async (req, res) => {
     res.json({ message: 'Session completed', session });
   } catch (error) {
     console.error('Error completing session:', error);
+    res.status(500).json({ message: 'Failed to complete session', error: error.message });
+  }
+});
+
+// Alias: support plural form as well
+router.post('/sessions/:sessionId/complete', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await SessionRecording.findOne({ sessionId });
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    session.isComplete = true;
+    session.endTime = new Date();
+    if (session.startTime) {
+      session.duration = Math.floor((session.endTime - session.startTime) / 1000);
+    }
+    await session.save();
+
+    res.json({ message: 'Session completed', session });
+  } catch (error) {
+    console.error('Error completing session (alias):', error);
     res.status(500).json({ message: 'Failed to complete session', error: error.message });
   }
 });
@@ -446,4 +482,134 @@ router.get('/heatmap/raw', async (req, res) => {
   }
 });
 
+// ===== DATA MANAGEMENT ENDPOINTS =====
+
+// Get analytics stats
+router.get('/stats', async (req, res) => {
+  try {
+    const [sessionCount, interactionCount, heatmapCount] = await Promise.all([
+      SessionRecording.countDocuments(),
+      UserInteraction.countDocuments(),
+      HeatmapData.countDocuments(),
+    ]);
+
+    res.json({
+      sessions: sessionCount,
+      interactions: interactionCount,
+      heatmapData: heatmapCount,
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ message: 'Failed to fetch stats', error: error.message });
+  }
+});
+
+// Get interactions with pagination
+router.get('/interactions', async (req, res) => {
+  try {
+    const { limit = 100, skip = 0 } = req.query;
+
+    const interactions = await UserInteraction.find()
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(skip))
+      .lean();
+
+    res.json(interactions);
+  } catch (error) {
+    console.error('Error fetching interactions:', error);
+    res.status(500).json({ message: 'Failed to fetch interactions', error: error.message });
+  }
+});
+
+// Delete single interaction
+router.delete('/interactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await UserInteraction.findByIdAndDelete(id);
+
+    if (!result) {
+      return res.status(404).json({ message: 'Interaction not found' });
+    }
+
+    res.json({ message: 'Interaction deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting interaction:', error);
+    res.status(500).json({ message: 'Failed to delete interaction', error: error.message });
+  }
+});
+
+// Delete single session
+router.delete('/sessions/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const result = await SessionRecording.findOneAndDelete({ sessionId });
+
+    if (!result) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    res.json({ message: 'Session deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    res.status(500).json({ message: 'Failed to delete session', error: error.message });
+  }
+});
+
+// Flush all analytics data
+router.delete('/flush-all', async (req, res) => {
+  try {
+    // Load all analytics models
+    const Session = require('../models/Session');
+    const PageView = require('../models/PageView');
+    const UserEvent = require('../models/UserEvent');
+    const EventAnalytics = require('../models/EventAnalytics');
+    const PerformanceMetrics = require('../models/PerformanceMetrics');
+    const Funnel = require('../models/Funnel');
+    const Experiment = require('../models/Experiment');
+    const Cohort = require('../models/Cohort');
+    const FeatureFlag = require('../models/FeatureFlag');
+
+    // Delete all analytics data from all models
+    const results = await Promise.all([
+      SessionRecording.deleteMany({}),
+      UserInteraction.deleteMany({}),
+      HeatmapData.deleteMany({}),
+      Session.deleteMany({}),
+      PageView.deleteMany({}),
+      UserEvent.deleteMany({}),
+      EventAnalytics.deleteMany({}),
+      PerformanceMetrics.deleteMany({}),
+      Funnel.deleteMany({}),
+      Experiment.deleteMany({}),
+      Cohort.deleteMany({}),
+      FeatureFlag.deleteMany({}),
+    ]);
+
+    res.json({ 
+      message: 'All analytics data has been deleted successfully',
+      deleted: {
+        sessionRecordings: results[0].deletedCount,
+        interactions: results[1].deletedCount,
+        heatmapData: results[2].deletedCount,
+        sessions: results[3].deletedCount,
+        pageViews: results[4].deletedCount,
+        userEvents: results[5].deletedCount,
+        eventAnalytics: results[6].deletedCount,
+        performanceMetrics: results[7].deletedCount,
+        funnels: results[8].deletedCount,
+        experiments: results[9].deletedCount,
+        cohorts: results[10].deletedCount,
+        featureFlags: results[11].deletedCount,
+      }
+    });
+  } catch (error) {
+    console.error('Error flushing data:', error);
+    res.status(500).json({ message: 'Failed to flush data', error: error.message });
+  }
+});
+
 module.exports = router;
+

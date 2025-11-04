@@ -29,10 +29,16 @@ import PerformanceAnalytics from "./pages/Admin/PerformanceAnalytics";
 import FunnelAnalysis from "./pages/Admin/FunnelAnalysis";
 import CohortAnalysis from "./pages/Admin/CohortAnalysis";
 import ABTesting from "./pages/Admin/ABTesting";
+import FeatureFlags from "./pages/Admin/FeatureFlags";
 import SearchResults from "./components/pages/SearchResults";
 import OrderSuccess from "./components/pages/OrderSuccess";
+import AdminDataManagement from "./pages/AdminDataManagement";
+// PostHog-Style Analytics Pages
+import ActivityFeed from "./pages/ActivityFeed";
+import PeopleTab from "./pages/PeopleTab";
 // Analytics Manager for comprehensive tracking
 import analyticsManager from "./services/AnalyticsManager";
+import trackingClient from "./services/trackingClient";
 import { useAuth } from "./context/AuthContext";
 
 function App() {
@@ -57,6 +63,9 @@ function App() {
     
     // Don't track admin users
     const isAdmin = auth?.user?.role === 'admin';
+    
+    // Update tracking client with admin status
+    trackingClient.updateAdminStatus(!!isAdmin);
     
     if (!trackingEnabled || hasOptedOut || isAdmin) {
       analyticsManager.destroy();
@@ -113,6 +122,9 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-success" element={<OrderSuccess />} />
+            {/* Analytics pages (top-level paths as requested) */}
+            <Route path="/analytics/activity" element={<ActivityFeed />} />
+            <Route path="/analytics/people" element={<PeopleTab />} />
             {/* Admin Routes */}
             <Route
               path="/admin"
@@ -134,7 +146,11 @@ function App() {
               <Route path="analytics/funnels" element={<FunnelAnalysis />} />
               <Route path="analytics/cohorts" element={<CohortAnalysis />} />
               <Route path="analytics/experiments" element={<ABTesting />} />
+              <Route path="analytics/flags" element={<FeatureFlags />} />
+              <Route path="analytics/activity" element={<ActivityFeed />} />
+              <Route path="analytics/people" element={<PeopleTab />} />
               <Route path="tracking" element={<TrackingSetup />} />
+              <Route path="data" element={<AdminDataManagement />} />
             </Route>
           </Routes>
         </div>

@@ -17,6 +17,9 @@ import {
   LogOut,
   Store,
   User,
+  Activity,
+  UserCircle,
+  Database,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -108,6 +111,16 @@ const AdminLayout: React.FC = () => {
       icon: TrendingUp,
     },
     {
+      title: 'Activity Feed',
+      url: '/admin/analytics/activity',
+      icon: Activity,
+    },
+    {
+      title: 'People',
+      url: '/admin/analytics/people',
+      icon: UserCircle,
+    },
+    {
       title: 'Session Recordings',
       url: '/admin/analytics/recordings',
       icon: Video,
@@ -138,6 +151,11 @@ const AdminLayout: React.FC = () => {
       icon: FlaskConical,
     },
     {
+      title: 'Feature Flags',
+      url: '/admin/analytics/flags',
+      icon: Settings,
+    },
+    {
       title: 'Events & Metrics',
       url: '/admin/analytics',
       icon: BarChart3,
@@ -149,6 +167,11 @@ const AdminLayout: React.FC = () => {
       title: 'Products',
       url: '/admin/products',
       icon: Package,
+    },
+    {
+      title: 'Data Management',
+      url: '/admin/data',
+      icon: Database,
     },
     {
       title: 'Tracking Setup',

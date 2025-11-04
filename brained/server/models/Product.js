@@ -8,6 +8,8 @@ const productSchema = new mongoose.Schema(
     originalPrice: { type: Number }, // for showing discounts
     category: { type: String },
     featured: { type: Boolean, default: false },
+    // Seeded data identifier (starts with SEED- for seeded items, null for user-created)
+    seededId: { type: String, default: null, index: true },
     // Main image (base64 or URL)
     image: { type: String },
     // Gallery images array (base64 or URLs)

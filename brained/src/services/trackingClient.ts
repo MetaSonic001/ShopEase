@@ -44,10 +44,50 @@ class TrackingClient {
   private flushTimer: number | null = null;
   private lastMouseMove: number = 0;
   private mouseMoveThrottle: number = 100; // Throttle mousemove to 100ms
+  private isAdmin: boolean = false;
 
   constructor() {
+    this.checkAdminStatus();
     this.initSession();
     this.setupEventListeners();
+  }
+
+  private checkAdminStatus(): void {
+    // Check if user is logged in and is admin
+    try {
+      const authData = localStorage.getItem('auth');
+      if (authData) {
+        const auth = JSON.parse(authData);
+        this.isAdmin = auth?.user?.role === 'admin';
+      }
+    } catch (e) {
+      // Auth is in React context, not localStorage
+      // Will be set via updateAdminStatus when user logs in
+    }
+  }
+
+  public updateAdminStatus(isAdmin: boolean): void {
+    this.isAdmin = isAdmin;
+    // Stop recording immediately if user is admin
+    if (isAdmin && this.isRecording) {
+      this.stopRecording();
+    }
+  }
+
+  private shouldTrack(): boolean {
+    // Don't track if user is admin or on admin routes
+    if (this.isAdmin) return false;
+    if (window.location.pathname.startsWith('/admin')) return false;
+    
+    // Check if tracking is enabled
+    const trackingEnabled = localStorage.getItem('tracking_enabled') !== 'false';
+    if (!trackingEnabled) return false;
+    
+    // Check if user has opted out
+    const hasOptedOut = localStorage.getItem('analytics_opt_out') === 'true';
+    if (hasOptedOut) return false;
+    
+    return true;
   }
 
   private initSession(): void {
@@ -87,6 +127,8 @@ class TrackingClient {
   private setupEventListeners(): void {
     // Click tracking
     document.addEventListener('click', (e) => {
+      if (!this.shouldTrack()) return; // Skip tracking for admins
+      
       const target = e.target as HTMLElement;
       this.captureEvent({
         eventType: 'click',
@@ -122,6 +164,7 @@ class TrackingClient {
     // Mouse move tracking (throttled)
     document.addEventListener('mousemove', (e) => {
       if (!this.isRecording) return;
+      if (!this.shouldTrack()) return; // Skip tracking for admins
       
       const now = Date.now();
       if (now - this.lastMouseMove < this.mouseMoveThrottle) return;
@@ -140,6 +183,7 @@ class TrackingClient {
     // Scroll tracking
     let scrollTimeout: number | null = null;
     document.addEventListener('scroll', () => {
+      if (!this.shouldTrack()) return; // Skip tracking for admins
       if (scrollTimeout) clearTimeout(scrollTimeout);
       
       scrollTimeout = setTimeout(() => {
@@ -245,6 +289,7 @@ class TrackingClient {
 
   public captureEvent(eventData: EventData): void {
     if (!this.sessionId) return;
+    if (!this.shouldTrack()) return; // Don't track admin users or admin pages
 
     const payload = {
       sessionId: this.sessionId,
@@ -285,12 +330,15 @@ class TrackingClient {
       this.setSuperProperties(properties);
     }
 
-    axios.post(`${API_URL}/api/analytics/identify`, {
-      userId,
-      properties,
-    }).catch((err) => {
-      console.error('Failed to identify user', err);
-    });
+    // Don't send identify event for admin users
+    if (this.shouldTrack()) {
+      axios.post(`${API_URL}/api/analytics/identify`, {
+        userId,
+        properties,
+      }).catch((err) => {
+        console.error('Failed to identify user', err);
+      });
+    }
   }
 
   public setSuperProperties(properties: SuperProperties): void {
@@ -300,6 +348,7 @@ class TrackingClient {
 
   public startRecording(): void {
     if (this.isRecording) return;
+    if (!this.shouldTrack()) return; // Don't record admin users or admin pages
     
     this.isRecording = true;
     this.recordingBuffer = [];

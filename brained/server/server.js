@@ -110,6 +110,7 @@ io.on('connection', (socket) => {
 // routes
 const authRoutes = require('./routes/auth');
 const analyticsRoutes = require('./routes/analytics');
+const featureFlagsRoutes = require('./routes/featureFlags');
 const trackingRoutes = require('./routes/trackingRoutes');
 const productsRoutes = require('./routes/products');
 const sessionsRoutes = require('./routes/sessions');
@@ -118,6 +119,7 @@ const funnelsRoutes = require('./routes/funnels');
 const cohortsRoutes = require('./routes/cohorts');
 const experimentsRoutes = require('./routes/experiments');
 const ordersRoutes = require('./routes/orders');
+const analyticsAdminRoutes = require('./routes/analyticsAdmin');
 const rateLimiter = require('./middleware/rateLimiter');
 const deviceInfo = require('./middleware/deviceInfo');
 
@@ -133,6 +135,8 @@ app.get('/api/health', (req, res) => {
 
 // Mount analytics routes with deviceInfo middleware to capture UA data
 app.use('/api/analytics', deviceInfo, analyticsRoutes);
+app.use('/api/analytics/flags', featureFlagsRoutes);
+app.use('/api/analytics/admin', analyticsAdminRoutes);
 
 // tracking routes for session recording, heatmaps, and interactions
 app.use('/api/tracking', deviceInfo, trackingRoutes);
@@ -157,6 +161,10 @@ app.use('/api/experiments', experimentsRoutes);
 
 // orders API
 app.use('/api/orders', ordersRoutes);
+
+// seeding API
+const seedRoutes = require('./routes/seed');
+app.use('/api/seed', seedRoutes);
 
 // health
 app.get('/', (req, res) => res.json({ message: 'Brained API' }));

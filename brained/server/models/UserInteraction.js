@@ -47,7 +47,7 @@ const userInteractionSchema = new mongoose.Schema(
       // Element info
       element: String,
       elementId: String,
-      className: String,
+      className: mongoose.Schema.Types.Mixed, // Can be string or object
       text: String,
       
       // Position data
