@@ -34,6 +34,9 @@ import OrderSuccess from "./components/pages/OrderSuccess";
 // Analytics Manager for comprehensive tracking
 import analyticsManager from "./services/AnalyticsManager";
 import { useAuth } from "./context/AuthContext";
+import Analytics2 from "./pages/Admin/Analytics2";
+import RealTimeAnalyticsDashboard2 from "./pages/Admin/RealTimeAnalyticsDashboards2";
+import FunnelAnalysis2 from "./pages/Admin/FunnelAnalysis2";
 
 function App() {
   const location = useLocation();
@@ -113,6 +116,9 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-success" element={<OrderSuccess />} />
+            <Route path="analytics2" element={<Analytics2/>} />
+            <Route path="Overview2" element={<RealTimeAnalyticsDashboard2 />} />
+            <Route path="FunnelAnalysis2" element={<FunnelAnalysis2 />} />
             {/* Admin Routes */}
             <Route
               path="/admin"
@@ -134,7 +140,7 @@ function App() {
               <Route path="analytics/funnels" element={<FunnelAnalysis />} />
               <Route path="analytics/cohorts" element={<CohortAnalysis />} />
               <Route path="analytics/experiments" element={<ABTesting />} />
-              <Route path="tracking" element={<TrackingSetup />} />
+              <Route path="tracking" element={<TrackingSetup />} /> 
             </Route>
           </Routes>
         </div>
