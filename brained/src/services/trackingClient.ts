@@ -405,13 +405,16 @@ class TrackingClient {
         const endTime = performance.now();
         const duration = endTime - startTime;
 
-        apiCalls.push({
-          url,
-          method: args[1]?.method || 'GET',
-          status: response.status,
-          duration,
-          timestamp: new Date().toISOString()
-        });
+        // Only log non-auth errors (401 is expected for unauthenticated users)
+        if (response.status !== 401) {
+          apiCalls.push({
+            url,
+            method: args[1]?.method || 'GET',
+            status: response.status,
+            duration,
+            timestamp: new Date().toISOString()
+          });
+        }
 
         return response;
       } catch (error: any) {
@@ -453,13 +456,16 @@ class TrackingClient {
           const perfTrack = (this as any)._perfTrack;
           const duration = endTime - perfTrack.startTime;
 
-          apiCalls.push({
-            url: perfTrack.url,
-            method: perfTrack.method,
-            status: this.status,
-            duration,
-            timestamp: new Date().toISOString()
-          });
+          // Only log non-auth errors (401 is expected for unauthenticated users)
+          if (this.status !== 401) {
+            apiCalls.push({
+              url: perfTrack.url,
+              method: perfTrack.method,
+              status: this.status,
+              duration,
+              timestamp: new Date().toISOString()
+            });
+          }
         });
       }
 

@@ -217,7 +217,7 @@ const ABTesting: React.FC = () => {
       case 'completed':
         return 'bg-blue-100 text-blue-700 border-blue-200';
       default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
@@ -231,26 +231,27 @@ const ABTesting: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-3 text-lg text-slate-700">Loading experiments...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
-      <div className="mb-8">
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-6 mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">A/B Testing</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">A/B Testing</h1>
+            <p className="text-lg text-slate-600">
               Run experiments and optimize user experience
             </p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
             Create Experiment
@@ -258,17 +259,19 @@ const ABTesting: React.FC = () => {
         </div>
       </div>
 
+      <div className="px-6 pb-6">
+
       {/* Filters */}
       <div className="mb-6 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-500" />
+          <Filter className="w-5 h-5 text-slate-500" />
           <select
             value={selectedExperiment?._id || ''}
             onChange={(e) => {
               const experiment = experiments.find((exp) => exp._id === e.target.value);
               setSelectedExperiment(experiment || null);
             }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             {experiments.map((experiment) => (
               <option key={experiment._id} value={experiment._id}>
@@ -282,7 +285,7 @@ const ABTesting: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="all">All Status</option>
             <option value="draft">Draft</option>
@@ -294,7 +297,7 @@ const ABTesting: React.FC = () => {
 
         <button
           onClick={() => selectedExperiment && analyzeExperiment(selectedExperiment._id)}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -342,9 +345,9 @@ const ABTesting: React.FC = () => {
 
       {!selectedExperiment && experiments.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <FlaskConical className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Experiments Yet</h3>
-          <p className="text-gray-600 mb-6">
+          <FlaskConical className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-slate-900 mb-2">No Experiments Yet</h3>
+          <p className="text-slate-600 mb-6">
             Create your first A/B test to optimize user experience
           </p>
           <button
@@ -363,7 +366,7 @@ const ABTesting: React.FC = () => {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h2 className="text-2xl font-bold text-gray-900">{selectedExperiment.name}</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{selectedExperiment.name}</h2>
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(
                         selectedExperiment.status
@@ -373,9 +376,9 @@ const ABTesting: React.FC = () => {
                     </span>
                   </div>
                   {selectedExperiment.description && (
-                    <p className="text-gray-600 mb-3">{selectedExperiment.description}</p>
+                    <p className="text-slate-600 mb-3">{selectedExperiment.description}</p>
                   )}
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-slate-500">
                     Target Metric: <span className="font-semibold">{selectedExperiment.targetMetric}</span>
                   </p>
                 </div>
@@ -408,22 +411,22 @@ const ABTesting: React.FC = () => {
                     <span className="text-sm font-bold">WINNER</span>
                   </div>
                 )}
-                <h3 className="text-xl font-bold text-gray-900 mb-4">{result.name}</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-4">{result.name}</h3>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm text-gray-600">Impressions</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatNumber(result.impressions)}</p>
+                    <p className="text-sm text-slate-600">Impressions</p>
+                    <p className="text-2xl font-bold text-slate-900">{formatNumber(result.impressions)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Conversions</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatNumber(result.conversions)}</p>
+                    <p className="text-sm text-slate-600">Conversions</p>
+                    <p className="text-2xl font-bold text-slate-900">{formatNumber(result.conversions)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Conversion Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{result.conversionRate.toFixed(2)}%</p>
+                    <p className="text-sm text-slate-600">Conversion Rate</p>
+                    <p className="text-2xl font-bold text-slate-900">{result.conversionRate.toFixed(2)}%</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Statistical Confidence</p>
+                    <p className="text-sm text-slate-600">Statistical Confidence</p>
                     <p className={`text-2xl font-bold ${getConfidenceColor(result.confidence)}`}>
                       {result.confidence.toFixed(1)}%
                     </p>
@@ -435,7 +438,7 @@ const ABTesting: React.FC = () => {
 
           {/* Comparison Bar Chart */}
           <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Conversion Rate Comparison</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Conversion Rate Comparison</h2>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={results}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -460,7 +463,7 @@ const ABTesting: React.FC = () => {
           {/* Trend Chart */}
           {trendData.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Performance Over Time</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-6">Performance Over Time</h2>
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -495,12 +498,12 @@ const ABTesting: React.FC = () => {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Create New Experiment</h2>
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-2xl font-bold text-slate-900">Create New Experiment</h2>
             </div>
             <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Experiment Name *
                 </label>
                 <input
@@ -508,12 +511,12 @@ const ABTesting: React.FC = () => {
                   value={newExperiment.name}
                   onChange={(e) => setNewExperiment({ ...newExperiment, name: e.target.value })}
                   placeholder="e.g., Homepage Button Color Test"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Description
                 </label>
                 <textarea
@@ -521,18 +524,18 @@ const ABTesting: React.FC = () => {
                   onChange={(e) => setNewExperiment({ ...newExperiment, description: e.target.value })}
                   placeholder="Optional description"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Target Metric *
                 </label>
                 <select
                   value={newExperiment.targetMetric}
                   onChange={(e) => setNewExperiment({ ...newExperiment, targetMetric: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="conversion">Conversion Rate</option>
                   <option value="clicks">Click-Through Rate</option>
@@ -543,7 +546,7 @@ const ABTesting: React.FC = () => {
 
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-slate-700">
                     Variants * (min. 2)
                   </label>
                   <button
@@ -556,9 +559,9 @@ const ABTesting: React.FC = () => {
                 </div>
                 <div className="space-y-4">
                   {newExperiment.variants.map((variant, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div key={index} className="border border-slate-200 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-gray-900">{variant.name}</h4>
+                        <h4 className="font-semibold text-slate-900">{variant.name}</h4>
                         {newExperiment.variants.length > 2 && (
                           <button
                             onClick={() => removeVariant(index)}
@@ -574,7 +577,7 @@ const ABTesting: React.FC = () => {
                           value={variant.name}
                           onChange={(e) => updateVariant(index, 'name', e.target.value)}
                           placeholder="Variant name"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                         <input
                           type="number"
@@ -583,28 +586,28 @@ const ABTesting: React.FC = () => {
                           placeholder="Traffic weight (%)"
                           min="0"
                           max="100"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                         <textarea
                           value={variant.description || ''}
                           onChange={(e) => updateVariant(index, 'description', e.target.value)}
                           placeholder="Variant description (optional)"
                           rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                       </div>
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-slate-500 mt-2">
                   Total weight: {newExperiment.variants.reduce((sum, v) => sum + v.weight, 0)}% (should be 100%)
                 </p>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
@@ -623,7 +626,8 @@ const ABTesting: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </main>
   );
 };
 

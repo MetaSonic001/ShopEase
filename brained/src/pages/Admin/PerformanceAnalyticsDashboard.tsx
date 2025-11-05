@@ -181,39 +181,44 @@ const PerformanceAnalyticsDashboard: React.FC = () => {
         const score = getPerformanceScore(metricKey, value || 0);
 
         return (
-            <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
+                        <div className="p-2.5 bg-blue-100 rounded-lg">
                             {icon}
                         </div>
                         <div>
-                            <h3 className="font-semibold text-gray-900">{title}</h3>
-                            <p className="text-xs text-gray-500">{description}</p>
+                            <h3 className="font-semibold text-slate-900">{title}</h3>
+                            <p className="text-xs text-slate-600 mt-0.5">{description}</p>
                         </div>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${score.bgColor} ${score.color}`}>
+                    <div className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                        score.rating === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
+                        score.rating === 'Needs Improvement' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        score.rating === 'Poor' ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}>
                         {score.rating}
                     </div>
                 </div>
 
                 <div className="mb-3">
-                    <p className="text-3xl font-bold text-gray-900">{formatMetricValue(metricKey, value)}</p>
+                    <p className="text-3xl font-bold text-slate-900">{formatMetricValue(metricKey, value)}</p>
                 </div>
 
                 {percentileData && (
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
+                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-200">
                         <div>
-                            <p className="text-xs text-gray-500">P50</p>
-                            <p className="text-sm font-medium">{formatMetricValue(metricKey, percentileData.p50)}</p>
+                            <p className="text-xs text-slate-500 font-medium">P50</p>
+                            <p className="text-sm font-semibold text-slate-900">{formatMetricValue(metricKey, percentileData.p50)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500">P75</p>
-                            <p className="text-sm font-medium">{formatMetricValue(metricKey, percentileData.p75)}</p>
+                            <p className="text-xs text-slate-500 font-medium">P75</p>
+                            <p className="text-sm font-semibold text-slate-900">{formatMetricValue(metricKey, percentileData.p75)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500">P95</p>
-                            <p className="text-sm font-medium">{formatMetricValue(metricKey, percentileData.p95)}</p>
+                            <p className="text-xs text-slate-500 font-medium">P95</p>
+                            <p className="text-sm font-semibold text-slate-900">{formatMetricValue(metricKey, percentileData.p95)}</p>
                         </div>
                     </div>
                 )}
@@ -244,55 +249,59 @@ const PerformanceAnalyticsDashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-96">
+            <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
                 <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-                <span className="ml-3 text-lg">Loading performance data...</span>
+                <span className="ml-3 text-lg text-slate-700">Loading performance data...</span>
             </div>
         );
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Performance Analytics</h1>
-                    <p className="text-gray-600 mt-1">
-                        Monitor Core Web Vitals, API performance, and user experience metrics
-                    </p>
+            <div className="border-b border-slate-200/50 bg-white sticky top-0 z-10 backdrop-blur-sm">
+                <div className="max-w-7xl mx-auto px-6 py-8">
+                    <div className="flex justify-between items-center mb-4">
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-900">Performance Analytics</h1>
+                            <p className="text-sm text-slate-600 mt-1">
+                                Monitor Core Web Vitals, API performance, and user experience metrics
+                            </p>
+                        </div>
+                        <button
+                            onClick={fetchDetailedAnalytics}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Refresh
+                        </button>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-slate-500" />
+                            <span className="text-sm font-medium text-slate-700">Time Range:</span>
+                        </div>
+                        <div className="flex gap-2">
+                            {(['24h', '7d', '30d'] as const).map((range) => (
+                                <button
+                                    key={range}
+                                    onClick={() => setDateRange(range)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === range
+                                        ? 'bg-blue-600 text-white shadow-lg'
+                                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
-                <button
-                    onClick={fetchDetailedAnalytics}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                </button>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-xl shadow-md p-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-700">Time Range:</span>
-                    </div>
-                    <div className="flex gap-2">
-                        {(['24h', '7d', '30d'] as const).map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setDateRange(range)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === range
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                            >
-                                {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
+            <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
             {/* Summary Stats */}
             <div className="bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl shadow-md p-6">
@@ -562,6 +571,7 @@ const PerformanceAnalyticsDashboard: React.FC = () => {
                 </div>
             </div>
         </div>
+        </main>
     );
 };
 

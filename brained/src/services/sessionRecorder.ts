@@ -135,8 +135,9 @@ class SessionRecorder {
         // Font collection for accurate replay
         collectFonts: true,
         
-        // Inline images for complete replay
-        inlineImages: true,
+        // Inline images - DISABLED to prevent CORS errors with external images (Unsplash, etc)
+        // Images will still be captured by URL reference
+        inlineImages: false,
         
         // Inline stylesheets
         inlineStylesheet: true,
@@ -316,7 +317,9 @@ class SessionRecorder {
       const metadata = this.getSessionMetadata();
       
       // Pack events for compression before sending
-      const packedEvents = events.length > 0 ? pack(events) : '';
+      // Note: rrweb's pack() is designed to work with individual events during replay
+      // For transmission, we'll send the events array directly and let backend handle packing if needed
+      const packedEvents = events;
       
       await axios.post(`${API_URL}/api/tracking/session`, {
         sessionId: this.sessionId,
@@ -413,19 +416,23 @@ class SessionRecorder {
         const response = await self.originalFetch.apply(window, args);
         const duration = Date.now() - startTime;
         
-        self.networkRequests.push({
-          timestamp: startTime,
-          method,
-          url,
-          status: response.status,
-          duration,
-          type: 'fetch',
-        });
+        // Only log non-auth errors (401 is expected for unauthenticated users)
+        if (response.status !== 401) {
+          self.networkRequests.push({
+            timestamp: startTime,
+            method,
+            url,
+            status: response.status,
+            duration,
+            type: 'fetch',
+          });
+        }
         
         return response;
       } catch (error) {
         const duration = Date.now() - startTime;
         
+        // Log network errors
         self.networkRequests.push({
           timestamp: startTime,
           method,
@@ -454,14 +461,17 @@ class SessionRecorder {
       xhr.addEventListener('loadend', function() {
         const duration = Date.now() - (xhr as any)._rrwebStartTime;
         
-        self.networkRequests.push({
-          timestamp: (xhr as any)._rrwebStartTime,
-          method: (xhr as any)._rrwebMethod,
-          url: (xhr as any)._rrwebUrl,
-          status: xhr.status,
-          duration,
-          type: 'xhr',
-        });
+        // Only log non-auth errors (401 is expected for unauthenticated users)
+        if (xhr.status !== 401) {
+          self.networkRequests.push({
+            timestamp: (xhr as any)._rrwebStartTime,
+            method: (xhr as any)._rrwebMethod,
+            url: (xhr as any)._rrwebUrl,
+            status: xhr.status,
+            duration,
+            type: 'xhr',
+          });
+        }
       });
       
       return self.originalXHRSend.apply(this, [body]);

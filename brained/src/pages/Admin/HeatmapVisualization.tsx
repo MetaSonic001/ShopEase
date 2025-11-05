@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import {
   MousePointer2,
@@ -9,7 +9,11 @@ import {
   Eye,
   Filter,
   Monitor,
-  Smartphone
+  Smartphone,
+  Tablet,
+  TrendingUp,
+  Users,
+  Target,
 } from 'lucide-react';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
@@ -166,36 +170,49 @@ const HeatmapVisualization: React.FC = () => {
         return 'from-blue-500 to-cyan-500';
       case 'hover':
         return 'from-purple-500 to-pink-500';
+      case 'mousemove':
+        return 'from-purple-500 to-pink-500';
+      default:
+        return 'from-purple-500 to-pink-500';
     }
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Heatmap Visualization</h1>
-        <p className="text-gray-600">Visualize user interactions with click, scroll, and hover heatmaps</p>
-      </div>
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* Header */}
+      <div className="border-b border-slate-200/50 bg-white sticky top-0 z-10 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Heatmap Visualization</h1>
+              <p className="text-sm text-slate-600 mt-1">Visualize user interactions with click, scroll, and hover heatmaps</p>
+            </div>
+            {heatmapData.length > 0 && (
+              <button
+                onClick={exportHeatmap}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 font-medium shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Export PNG
+              </button>
+            )}
+          </div>
 
-      {/* Controls */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <div className="space-y-4">
-          {/* URL Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Page URL
-            </label>
+          {/* Filters */}
+          <div className="space-y-4">
+            {/* URL Input */}
             <div className="flex gap-2">
               <input
                 type="text"
                 value={pageURL}
                 onChange={(e) => setPageURL(e.target.value)}
                 placeholder="e.g., /products or https://example.com/products"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-sm"
               />
               <button
                 onClick={fetchHeatmapData}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium shadow-sm"
               >
                 {loading ? (
                   <>
@@ -210,209 +227,221 @@ const HeatmapVisualization: React.FC = () => {
                 )}
               </button>
             </div>
-          </div>
 
-          {/* Heatmap Type Selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Heatmap Type
-            </label>
-            <div className="flex gap-2">
+            {/* Heatmap Type & Device Filter */}
+            <div className="flex gap-3 flex-wrap">
               {(['click', 'scroll', 'hover', 'mousemove'] as HeatmapType[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => setHeatmapType(type)}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${heatmapType === type
-                      ? `bg-linear-to-r ${getHeatmapColor()} text-white shadow-lg`
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${heatmapType === type
+                      ? `bg-gradient-to-r ${getHeatmapColor()} text-white shadow-lg`
+                      : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                 >
-                  {type === 'click' && <MousePointer2 className="w-5 h-5" />}
-                  {type === 'scroll' && <ScrollText className="w-5 h-5" />}
-                  {type === 'hover' && <Activity className="w-5 h-5" />}
-                  {type === 'mousemove' && <Activity className="w-5 h-5" />}
+                  {type === 'click' && <MousePointer2 className="w-4 h-4" />}
+                  {type === 'scroll' && <ScrollText className="w-4 h-4" />}
+                  {type === 'hover' && <Activity className="w-4 h-4" />}
+                  {type === 'mousemove' && <Activity className="w-4 h-4" />}
                   {type === 'mousemove' ? 'Move' : type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Device Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Device Type
-            </label>
-            <div className="flex gap-2">
-              {(['all', 'desktop', 'mobile', 'tablet'] as DeviceType[]).map((device) => (
-                <button
-                  key={device}
-                  onClick={() => setDeviceType(device)}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${deviceType === device
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  {device.charAt(0).toUpperCase() + device.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Options */}
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showOverlay}
-                  onChange={(e) => setShowOverlay(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Show Overlay</span>
-              </label>
-
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Intensity:</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="1"
-                  step="0.1"
-                  value={intensity}
-                  onChange={(e) => setIntensity(parseFloat(e.target.value))}
-                  className="w-32"
-                />
-                <span className="text-sm text-gray-600">{(intensity * 100).toFixed(0)}%</span>
+              
+              <div className="ml-auto flex gap-2">
+                {(['all', 'desktop', 'mobile', 'tablet'] as DeviceType[]).map((device) => (
+                  <button
+                    key={device}
+                    onClick={() => setDeviceType(device)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${deviceType === device
+                        ? 'bg-slate-900 text-white shadow-lg'
+                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                  >
+                    {device === 'desktop' && <Monitor className="w-4 h-4 inline mr-1" />}
+                    {device === 'mobile' && <Smartphone className="w-4 h-4 inline mr-1" />}
+                    {device === 'tablet' && <Tablet className="w-4 h-4 inline mr-1" />}
+                    {device.charAt(0).toUpperCase() + device.slice(1)}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {heatmapData.length > 0 && (
-              <button
-                onClick={exportHeatmap}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export PNG
-              </button>
-            )}
+            {/* Options */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOverlay}
+                    onChange={(e) => setShowOverlay(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Show Overlay</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-slate-700">Intensity:</label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.1"
+                    value={intensity}
+                    onChange={(e) => setIntensity(parseFloat(e.target.value))}
+                    className="w-32"
+                  />
+                  <span className="text-sm font-semibold text-slate-900">{(intensity * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Stats */}
-      {heatmapData.length > 0 && metadata && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className={`w-12 h-12 bg-linear-to-r ${getHeatmapColor()} rounded-lg flex items-center justify-center mb-3`}>
-              {getHeatmapIcon()}
-            </div>
-            <p className="text-sm text-gray-500 mb-1">Total Interactions</p>
-            <p className="text-2xl font-bold text-gray-900">{metadata.totalInteractions}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500 mb-1">Unique Users</p>
-            <p className="text-2xl font-bold text-blue-600">{metadata.uniqueUsers}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500 mb-1">Heat Points</p>
-            <p className="text-2xl font-bold text-orange-600">
-              {heatmapData.length}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500 mb-1">Peak Value</p>
-            <p className="text-2xl font-bold text-green-600">
-              {Math.max(...heatmapData.map(p => p.value || 1))}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Heatmap Canvas */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="bg-gray-800 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-white">
-            {getHeatmapIcon()}
-            <span className="font-medium">
-              {heatmapType.charAt(0).toUpperCase() + heatmapType.slice(1)} Heatmap
-              {pageURL && ` - ${pageURL}`}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-gray-300">
-              <Filter className="w-4 h-4" />
-              <span>
-                {heatmapData.length} point{heatmapData.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          ref={containerRef}
-          className="relative bg-gray-100"
-          style={{ minHeight: '600px' }}
-        >
-          {/* Canvas for heatmap overlay */}
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            style={{ mixBlendMode: 'multiply' }}
-          />
-
-          {/* Placeholder content */}
-          {heatmapData.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className={`w-20 h-20 bg-gradient-to-r ${getHeatmapColor()} rounded-full flex items-center justify-center mx-auto mb-4 opacity-20`}>
-                  {getHeatmapIcon()}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats Cards */}
+        {heatmapData.length > 0 && metadata && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${getHeatmapColor().replace('from-', 'from-').replace(' to-', '/50 to-')}/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl`}></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`w-12 h-12 bg-gradient-to-r ${getHeatmapColor()} rounded-lg flex items-center justify-center`}>
+                    {getHeatmapIcon()}
+                  </div>
                 </div>
-                <p className="text-gray-400 text-lg mb-2">No heatmap data</p>
-                <p className="text-sm text-gray-400">Enter a page URL and click Generate to visualize user interactions</p>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{metadata.totalInteractions.toLocaleString()}</p>
+                <p className="text-sm text-slate-600">Total Interactions</p>
               </div>
             </div>
-          ) : (
-            <div className="p-6">
-              <div className="bg-white rounded-lg shadow-sm p-8 border-2 border-dashed border-gray-300">
-                <h3 className="text-xl font-semibold text-gray-700 mb-4">Page Content Preview</h3>
-                <p className="text-gray-500 mb-4">
-                  This is where your actual page content would be displayed. The heatmap overlay shows where users {heatmapType} most frequently.
-                </p>
-                <div className="space-y-4">
-                  <div className="h-12 bg-gray-200 rounded"></div>
-                  <div className="h-32 bg-gray-100 rounded"></div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="h-24 bg-gray-200 rounded"></div>
-                    <div className="h-24 bg-gray-200 rounded"></div>
-                    <div className="h-24 bg-gray-200 rounded"></div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-6 h-6 text-blue-600" />
                   </div>
-                  <div className="h-48 bg-gray-100 rounded"></div>
                 </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{metadata.uniqueUsers.toLocaleString()}</p>
+                <p className="text-sm text-slate-600">Unique Users</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <Target className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{heatmapData.length.toLocaleString()}</p>
+                <p className="text-sm text-slate-600">Heat Points</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{Math.max(...heatmapData.map(p => p.value || 1))}</p>
+                <p className="text-sm text-slate-600">Peak Value</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Heatmap Canvas */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-slate-900 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-white">
+              {getHeatmapIcon()}
+              <span className="font-medium">
+                {heatmapType.charAt(0).toUpperCase() + heatmapType.slice(1)} Heatmap
+                {pageURL && ` - ${pageURL}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <Filter className="w-4 h-4" />
+                <span>
+                  {heatmapData.length} point{heatmapData.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            ref={containerRef}
+            className="relative bg-slate-50"
+            style={{ minHeight: '600px' }}
+          >
+            {/* Canvas for heatmap overlay */}
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              style={{ mixBlendMode: 'multiply' }}
+            />
+
+            {/* Placeholder content */}
+            {heatmapData.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className={`w-20 h-20 bg-gradient-to-r ${getHeatmapColor()} rounded-full flex items-center justify-center mx-auto mb-4 opacity-20`}>
+                    {getHeatmapIcon()}
+                  </div>
+                  <p className="text-slate-600 text-lg font-semibold mb-2">No heatmap data</p>
+                  <p className="text-sm text-slate-500">Enter a page URL and click Generate to visualize user interactions</p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6">
+                <div className="bg-white rounded-xl shadow-sm p-8 border-2 border-dashed border-slate-200">
+                  <h3 className="text-xl font-semibold text-slate-800 mb-4">Page Content Preview</h3>
+                  <p className="text-slate-600 mb-4">
+                    This is where your actual page content would be displayed. The heatmap overlay shows where users {heatmapType} most frequently.
+                  </p>
+                  <div className="space-y-4">
+                    <div className="h-12 bg-slate-200 rounded-lg"></div>
+                    <div className="h-32 bg-slate-100 rounded-lg"></div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="h-24 bg-slate-200 rounded-lg"></div>
+                      <div className="h-24 bg-slate-200 rounded-lg"></div>
+                      <div className="h-24 bg-slate-200 rounded-lg"></div>
+                    </div>
+                    <div className="h-48 bg-slate-100 rounded-lg"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Legend */}
+          {heatmapData.length > 0 && showOverlay && (
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-slate-700">Intensity:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Low</span>
+                    <div className={`w-32 h-4 rounded bg-gradient-to-r ${getHeatmapColor()}`}></div>
+                    <span className="text-xs text-slate-500">High</span>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-600">
+                  Warmer colors indicate higher user activity
+                </p>
               </div>
             </div>
           )}
         </div>
-
-        {/* Legend */}
-        {heatmapData.length > 0 && showOverlay && (
-          <div className="bg-gray-50 px-6 py-4 border-t">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700">Intensity:</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Low</span>
-                  <div className={`w-32 h-4 rounded bg-gradient-to-r ${getHeatmapColor()}`}></div>
-                  <span className="text-xs text-gray-500">High</span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-500">
-                Warmer colors indicate higher user activity
-              </p>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+    </main>
   );
 };
 

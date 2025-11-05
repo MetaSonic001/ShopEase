@@ -93,23 +93,23 @@ const RecordingsList: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Session Recordings</h1>
-        <p className="text-gray-600">Watch user session replays with cursor movements and interactions</p>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Session Recordings</h1>
+        <p className="text-slate-600">Watch user session replays with cursor movements and interactions</p>
       </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-md p-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">Filters:</span>
+            <Filter className="w-5 h-5 text-slate-400" />
+            <span className="text-sm font-medium text-slate-700">Filters:</span>
           </div>
 
           <button
             onClick={() => setFilterErrors(!filterErrors)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterErrors
               ? 'bg-red-100 text-red-700 border border-red-300'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
           >
             <AlertCircle className="w-4 h-4 inline mr-2" />
@@ -117,13 +117,13 @@ const RecordingsList: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Search className="w-5 h-5 text-gray-400" />
+            <Search className="w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="Search by User ID..."
               value={searchUserId}
               onChange={(e) => setSearchUserId(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
@@ -142,7 +142,7 @@ const RecordingsList: React.FC = () => {
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <MonitorPlay className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-pulse" />
-            <p className="text-gray-600">Loading recordings...</p>
+            <p className="text-slate-600">Loading recordings...</p>
           </div>
         </div>
       ) : error ? (
@@ -155,9 +155,9 @@ const RecordingsList: React.FC = () => {
       ) : recordings.length === 0 ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
-            <MonitorPlay className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-2">No recordings found</p>
-            <p className="text-sm text-gray-400">Recordings will appear here once users start visiting your site</p>
+            <MonitorPlay className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-600 mb-2">No recordings found</p>
+            <p className="text-sm text-slate-400">Recordings will appear here once users start visiting your site</p>
           </div>
         </div>
       ) : (
@@ -166,7 +166,7 @@ const RecordingsList: React.FC = () => {
             {recordings.map((recording) => (
               <div
                 key={recording.sessionId}
-                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all cursor-pointer border border-gray-100 hover:border-blue-300 overflow-hidden group"
+                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all cursor-pointer border border-slate-100 hover:border-blue-300 overflow-hidden group"
                 onClick={() => navigate(`/admin/analytics/recordings/${recording.sessionId}`)}
               >
                 {/* Preview Area */}
@@ -190,10 +190,10 @@ const RecordingsList: React.FC = () => {
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1 truncate">
+                      <h3 className="font-semibold text-slate-900 mb-1 truncate">
                         {recording.userName || recording.userId || 'Anonymous User'}
                       </h3>
-                      <p className="text-xs text-gray-500">{formatDate(recording.startTime)}</p>
+                      <p className="text-xs text-slate-500">{formatDate(recording.startTime)}</p>
                     </div>
                     <button
                       onClick={(e) => {
@@ -208,22 +208,22 @@ const RecordingsList: React.FC = () => {
 
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div className="text-center p-2 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Events</p>
-                      <p className="text-sm font-bold text-gray-900">{recording.stats?.totalEvents || 0}</p>
+                    <div className="text-center p-2 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Events</p>
+                      <p className="text-sm font-bold text-slate-900">{recording.stats?.totalEvents || 0}</p>
                     </div>
                     <div className="text-center p-2 bg-blue-50 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Clicks</p>
+                      <p className="text-xs text-slate-500 mb-1">Clicks</p>
                       <p className="text-sm font-bold text-blue-600">{recording.stats?.totalClicks || 0}</p>
                     </div>
                     <div className="text-center p-2 bg-green-50 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Scrolls</p>
+                      <p className="text-xs text-slate-500 mb-1">Scrolls</p>
                       <p className="text-sm font-bold text-green-600">{recording.stats?.totalScrolls || 0}</p>
                     </div>
                   </div>
 
                   {/* Device Info */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500 border-t border-gray-100 pt-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 border-t border-slate-100 pt-3">
                     <MousePointer2 className="w-4 h-4" />
                     <span>
                       {recording.device?.type || 'Unknown'} • {recording.device?.browser || 'Unknown'} • {recording.device?.os || 'Unknown'}
@@ -240,17 +240,17 @@ const RecordingsList: React.FC = () => {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
-              <span className="px-4 py-2 text-sm text-gray-600">
+              <span className="px-4 py-2 text-sm text-slate-600">
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

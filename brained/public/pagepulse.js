@@ -491,13 +491,16 @@
           const endTime = performance.now();
           const duration = endTime - startTime;
 
-          performanceTracker.metrics.apiCalls.push({
-            url,
-            method: args[1]?.method || 'GET',
-            status: response.status,
-            duration,
-            timestamp: new Date().toISOString()
-          });
+          // Only log non-auth errors (401 is expected for unauthenticated users)
+          if (response.status !== 401) {
+            performanceTracker.metrics.apiCalls.push({
+              url,
+              method: args[1]?.method || 'GET',
+              status: response.status,
+              duration,
+              timestamp: new Date().toISOString()
+            });
+          }
 
           return response;
         } catch (error) {
@@ -534,13 +537,16 @@
             const endTime = performance.now();
             const duration = endTime - this._perfTrack.startTime;
 
-            performanceTracker.metrics.apiCalls.push({
-              url: this._perfTrack.url,
-              method: this._perfTrack.method,
-              status: this.status,
-              duration,
-              timestamp: new Date().toISOString()
-            });
+            // Only log non-auth errors (401 is expected for unauthenticated users)
+            if (this.status !== 401) {
+              performanceTracker.metrics.apiCalls.push({
+                url: this._perfTrack.url,
+                method: this._perfTrack.method,
+                status: this.status,
+                duration,
+                timestamp: new Date().toISOString()
+              });
+            }
           });
         }
 

@@ -21,7 +21,7 @@ import {
   Video,
   Target
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 const SOCKET_URL = API_URL;
@@ -56,6 +56,7 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('Admin');
   const [greeting, setGreeting] = useState('');
+  const [timeFilter, setTimeFilter] = useState('24h');
 
   useEffect(() => {
     // Set greeting based on time
@@ -220,315 +221,356 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Welcome Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* Header Section */}
+      <div className="px-6 py-8 border-b border-slate-200/50 bg-white sticky top-0 z-10 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900">
               {greeting}, {userName}! 👋
             </h1>
-            <p className="text-lg text-gray-600">
-              Here's what's happening with your website today
-            </p>
+            <p className="text-slate-600 mt-1">Monitor your website performance in real-time</p>
           </div>
           <div className="flex items-center gap-3">
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+              className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
             <button
               onClick={() => navigate('/admin/analytics/recordings')}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-slate-700 font-medium"
             >
               <Video className="w-5 h-5" />
-              View Recordings
-            </button>
-            <button
-              onClick={() => navigate('/admin/analytics/heatmap')}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              <Target className="w-5 h-5" />
-              Heatmaps
+              Recordings
             </button>
             <button
               onClick={fetchDashboardData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
             >
               <Activity className="w-5 h-5 animate-pulse" />
-              Live
+              Refresh
             </button>
           </div>
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Active Visitors */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div className="flex items-center gap-1 text-sm bg-white bg-opacity-20 px-2 py-1 rounded-full">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              Live
-            </div>
-          </div>
-          <p className="text-4xl font-bold mb-1">{formatNumber(stats.activeVisitors)}</p>
-          <p className="text-blue-100">Active Visitors</p>
-        </div>
-
-        {/* Total Visitors */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-green-600">
-              <ArrowUp className="w-4 h-4" />
-              12%
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900 mb-1">{formatNumber(stats.totalVisitors)}</p>
-          <p className="text-sm text-gray-500">Total Visitors</p>
-        </div>
-
-        {/* Page Views */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Eye className="w-6 h-6 text-purple-600" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-purple-600">
-              <ArrowUp className="w-4 h-4" />
-              8%
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900 mb-1">{formatNumber(stats.totalPageViews)}</p>
-          <p className="text-sm text-gray-500">Page Views</p>
-        </div>
-
-        {/* Avg Session Duration */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-orange-600" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-red-600">
-              <ArrowDown className="w-4 h-4" />
-              3%
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900 mb-1">{formatDuration(stats.avgSessionDuration)}</p>
-          <p className="text-sm text-gray-500">Avg Session Duration</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Event Trends Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-blue-600" />
-              Event Trends
-            </h2>
-            <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-              <option>Last 24 Hours</option>
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-            </select>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={stats.eventTrends}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="time" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip />
-              <Line 
-                type="monotone" 
-                dataKey="events" 
-                stroke="#3b82f6" 
-                strokeWidth={2}
-                dot={{ fill: '#3b82f6', r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Real-time Activity Feed */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Zap className="w-6 h-6 text-yellow-500" />
-            Live Activity
-          </h2>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {stats.realtimeEvents.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">Waiting for events...</p>
-            ) : (
-              stats.realtimeEvents.map((event, idx) => (
-                <div 
-                  key={idx}
-                  className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <MousePointer2 className="w-4 h-4 text-blue-600" />
+      {/* Main Content */}
+      <div className="px-6 py-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Active Visitors Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-blue-600" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{event.type}</p>
-                    <p className="text-xs text-gray-500 truncate">{event.page}</p>
-                    <p className="text-xs text-gray-400">{new Date(event.timestamp).toLocaleTimeString()}</p>
+                  <div className="flex items-center gap-1 text-xs font-semibold bg-green-50 text-green-700 px-2.5 py-1 rounded-full border border-green-200">
+                    <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse"></div>
+                    Live
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.activeVisitors)}</p>
+                <p className="text-sm text-slate-600">Active Visitors</p>
+              </div>
+            </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Top Pages */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-green-600" />
-            Top Pages
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stats.topPages}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="page" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip />
-              <Bar dataKey="views" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Device Breakdown */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Smartphone className="w-6 h-6 text-purple-600" />
-            Device Breakdown
-          </h2>
-          <div className="flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={stats.deviceBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {stats.deviceBreakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Browser Stats */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Chrome className="w-5 h-5 text-blue-600" />
-            Top Browsers
-          </h3>
-          <div className="space-y-3">
-            {stats.browserBreakdown.slice(0, 5).map((browser, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">{browser.browser}</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{ 
-                        width: `${(browser.count / (stats.browserBreakdown[0]?.count || 1)) * 100}%` 
-                      }}
-                    ></div>
+            {/* Total Visitors Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-6 h-6 text-green-600" />
                   </div>
-                  <span className="text-sm font-medium text-gray-900">{browser.count}</span>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                    <ArrowUp className="w-3 h-3" />
+                    12%
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.totalVisitors)}</p>
+                <p className="text-sm text-slate-600">Total Visitors</p>
+              </div>
+            </div>
+
+            {/* Page Views Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Eye className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                    <ArrowUp className="w-3 h-3" />
+                    8%
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.totalPageViews)}</p>
+                <p className="text-sm text-slate-600">Page Views</p>
+              </div>
+            </div>
+
+            {/* Avg Session Duration Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
+                    <ArrowDown className="w-3 h-3" />
+                    3%
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{formatDuration(stats.avgSessionDuration)}</p>
+                <p className="text-sm text-slate-600">Avg Session Duration</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    Traffic Trends
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Hourly event metrics</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bounce Rate */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-orange-600" />
-            Bounce Rate
-          </h3>
-          <div className="text-center py-6">
-            <div className="relative inline-flex items-center justify-center">
-              <svg className="w-32 h-32">
-                <circle
-                  className="text-gray-200"
-                  strokeWidth="10"
-                  stroke="currentColor"
-                  fill="transparent"
-                  r="56"
-                  cx="64"
-                  cy="64"
-                />
-                <circle
-                  className="text-orange-600"
-                  strokeWidth="10"
-                  strokeDasharray={2 * Math.PI * 56}
-                  strokeDashoffset={2 * Math.PI * 56 * (1 - stats.bounceRate / 100)}
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="transparent"
-                  r="56"
-                  cx="64"
-                  cy="64"
-                  transform="rotate(-90 64 64)"
-                />
-              </svg>
-              <span className="absolute text-3xl font-bold text-gray-900">
-                {stats.bounceRate.toFixed(1)}%
-              </span>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={stats.eventTrends} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="time" stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1e293b",
+                      border: "1px solid #475569",
+                      borderRadius: "8px",
+                      color: "#fff",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="events"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorEvents)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
-            <p className="text-sm text-gray-500 mt-4">
-              {stats.bounceRate < 40 ? 'Excellent' : stats.bounceRate < 60 ? 'Good' : 'Needs Improvement'}
-            </p>
-          </div>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Globe className="w-5 h-5 text-green-600" />
-            Quick Actions
-          </h3>
-          <div className="space-y-3">
-            <button
-              onClick={() => navigate('/admin/analytics/recordings')}
-              className="w-full px-4 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-left flex items-center gap-3"
-            >
-              <Video className="w-5 h-5" />
-              <span className="font-medium">View Session Recordings</span>
-            </button>
-            <button
-              onClick={() => navigate('/admin/analytics/heatmap')}
-              className="w-full px-4 py-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-left flex items-center gap-3"
-            >
-              <Target className="w-5 h-5" />
-              <span className="font-medium">Generate Heatmap</span>
-            </button>
-            <button
-              onClick={() => navigate('/admin/analytics/funnels')}
-              className="w-full px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-left flex items-center gap-3"
-            >
-              <TrendingUp className="w-5 h-5" />
-              <span className="font-medium">Analyze Funnels</span>
-            </button>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-yellow-500" />
+                Live Activity
+              </h2>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {stats.realtimeEvents.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Zap className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">Waiting for events...</p>
+                  </div>
+                ) : (
+                  stats.realtimeEvents.map((event, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors border border-slate-200/50"
+                    >
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                        <MousePointer2 className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{event.type}</p>
+                        <p className="text-xs text-slate-500 truncate">{event.page}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {new Date(event.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Top Pages Chart */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-green-600" />
+                Top Pages
+              </h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={stats.topPages} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="page" stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1e293b",
+                      border: "1px solid #475569",
+                      borderRadius: "8px",
+                      color: "#fff",
+                    }}
+                  />
+                  <Bar dataKey="views" fill="#10b981" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Device Breakdown Chart */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-purple-600" />
+                Device Breakdown
+              </h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={stats.deviceBreakdown}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="count"
+                  >
+                    {stats.deviceBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1e293b",
+                      border: "1px solid #475569",
+                      borderRadius: "8px",
+                      color: "#fff",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Browser Stats */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Chrome className="w-5 h-5 text-blue-600" />
+                Top Browsers
+              </h3>
+              <div className="space-y-4">
+                {stats.browserBreakdown.slice(0, 5).map((browser, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-700">{browser.browser}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 bg-slate-200 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all"
+                          style={{
+                            width: `${(browser.count / (stats.browserBreakdown[0]?.count || 1)) * 100}%`,
+                          }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900 w-8 text-right">{browser.count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bounce Rate */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                Bounce Rate
+              </h3>
+              <div className="text-center">
+                <div className="relative inline-flex items-center justify-center mb-4">
+                  <svg className="w-32 h-32">
+                    <circle
+                      className="text-slate-200"
+                      strokeWidth="8"
+                      stroke="currentColor"
+                      fill="transparent"
+                      r="58"
+                      cx="64"
+                      cy="64"
+                    />
+                    <circle
+                      className="text-orange-500"
+                      strokeWidth="8"
+                      strokeDasharray={2 * Math.PI * 58}
+                      strokeDashoffset={2 * Math.PI * 58 * (1 - stats.bounceRate / 100)}
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="transparent"
+                      r="58"
+                      cx="64"
+                      cy="64"
+                      transform="rotate(-90 64 64)"
+                      style={{ transition: "stroke-dashoffset 0.5s ease" }}
+                    />
+                  </svg>
+                  <span className="absolute text-2xl font-bold text-slate-900">{stats.bounceRate.toFixed(1)}%</span>
+                </div>
+                <p className="text-sm font-medium text-slate-600">
+                  {stats.bounceRate < 40 ? "✨ Excellent" : stats.bounceRate < 60 ? "👍 Good" : "⚠️ Needs Improvement"}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Globe className="w-5 h-5 text-green-600" />
+                Quick Actions
+              </h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => navigate('/admin/analytics/recordings')}
+                  className="w-full px-4 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-left flex items-center gap-3 font-medium border border-blue-200"
+                >
+                  <Video className="w-4 h-4" />
+                  <span className="text-sm">Session Recordings</span>
+                </button>
+                <button
+                  onClick={() => navigate('/admin/analytics/heatmap')}
+                  className="w-full px-4 py-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-left flex items-center gap-3 font-medium border border-purple-200"
+                >
+                  <Target className="w-4 h-4" />
+                  <span className="text-sm">Heatmaps</span>
+                </button>
+                <button
+                  onClick={() => navigate('/admin/analytics/funnels')}
+                  className="w-full px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-left flex items-center gap-3 font-medium border border-green-200"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-sm">Funnel Analysis</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

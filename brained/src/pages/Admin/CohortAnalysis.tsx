@@ -186,26 +186,27 @@ const CohortAnalysis: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-3 text-lg text-slate-700">Loading cohort data...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
-      <div className="mb-8">
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-6 mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Cohort Analysis</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">Cohort Analysis</h1>
+            <p className="text-lg text-slate-600">
               Segment users and analyze their behavior over time
             </p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
             Create Cohort
@@ -213,77 +214,78 @@ const CohortAnalysis: React.FC = () => {
         </div>
       </div>
 
-      {/* Cohort Selector */}
-      <div className="mb-6 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-500" />
-          <select
-            value={selectedCohort?._id || ''}
-            onChange={(e) => {
-              const cohort = cohorts.find((c) => c._id === e.target.value);
-              setSelectedCohort(cohort || null);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {cohorts.map((cohort) => (
-              <option key={cohort._id} value={cohort._id}>
-                {cohort.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-gray-500" />
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
-        </div>
-
-        <button
-          onClick={() => selectedCohort && analyzeCohort(selectedCohort._id)}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
-
-        {selectedCohort && (
-          <>
-            <button
-              onClick={exportData}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+      <div className="px-6 pb-6">
+        {/* Cohort Selector */}
+        <div className="mb-6 flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-slate-500" />
+            <select
+              value={selectedCohort?._id || ''}
+              onChange={(e) => {
+                const cohort = cohorts.find((c) => c._id === e.target.value);
+                setSelectedCohort(cohort || null);
+              }}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
             >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            <button
-              onClick={() => deleteCohort(selectedCohort._id)}
-              className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2 ml-auto"
+              {cohorts.map((cohort) => (
+                <option key={cohort._id} value={cohort._id}>
+                  {cohort.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-slate-500" />
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
             >
-              <Trash2 className="w-4 h-4" />
-              Delete Cohort
-            </button>
-          </>
-        )}
-      </div>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+            </select>
+          </div>
+
+          <button
+            onClick={() => selectedCohort && analyzeCohort(selectedCohort._id)}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+
+          {selectedCohort && (
+            <>
+              <button
+                onClick={exportData}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <button
+                onClick={() => deleteCohort(selectedCohort._id)}
+                className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-all shadow-sm hover:shadow flex items-center gap-2 ml-auto"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Cohort
+              </button>
+            </>
+          )}
+        </div>
 
       {!selectedCohort && cohorts.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Cohorts Yet</h3>
-          <p className="text-gray-600 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+          <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-slate-900 mb-2">No Cohorts Yet</h3>
+          <p className="text-slate-600 mb-6">
             Create your first cohort to segment users and analyze their behavior
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md inline-flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
             Create Your First Cohort
@@ -293,12 +295,12 @@ const CohortAnalysis: React.FC = () => {
         <>
           {/* Cohort Info Card */}
           {selectedCohort && (
-            <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 mb-8">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedCohort.name}</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedCohort.name}</h2>
                   {selectedCohort.description && (
-                    <p className="text-gray-600 mb-4">{selectedCohort.description}</p>
+                    <p className="text-slate-600 mb-4">{selectedCohort.description}</p>
                   )}
                   <div className="flex flex-wrap gap-2">
                     {(() => {
@@ -337,20 +339,20 @@ const CohortAnalysis: React.FC = () => {
                         chips.map((label, idx) => (
                           <span
                             key={idx}
-                            className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium"
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-sm font-semibold"
                           >
                             {label}
                           </span>
                         ))
                       ) : (
-                        <span className="text-sm text-gray-500">No conditions defined</span>
+                        <span className="text-sm text-slate-500">No conditions defined</span>
                       );
                     })()}
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600 mb-1">Total Users</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-sm text-slate-600 mb-1 font-medium">Total Users</p>
+                  <p className="text-3xl font-bold text-slate-900">
                     {formatNumber(selectedCohort.userCount || 0)}
                   </p>
                 </div>
@@ -361,14 +363,14 @@ const CohortAnalysis: React.FC = () => {
           {/* Behavior Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {behaviorData.map((metric, index) => (
-              <div key={index} className="bg-white rounded-xl shadow-sm p-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">{metric.metric}</p>
-                <p className="text-3xl font-bold text-gray-900 mb-2">
+              <div key={index} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-6">
+                <p className="text-sm font-semibold text-slate-600 mb-2">{metric.metric}</p>
+                <p className="text-3xl font-bold text-slate-900 mb-2">
                   {formatNumber(metric.value)}
                 </p>
                 {metric.trend !== 0 && (
                   <div
-                    className={`flex items-center gap-1 text-sm ${
+                    className={`flex items-center gap-1 text-sm font-medium ${
                       metric.trend > 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
@@ -385,8 +387,8 @@ const CohortAnalysis: React.FC = () => {
           </div>
 
           {/* Retention Chart */}
-          <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Retention Over Time</h2>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-8 mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Retention Over Time</h2>
             <ResponsiveContainer width="100%" height={400}>
               <AreaChart data={retentionData}>
                 <defs>
@@ -395,20 +397,22 @@ const CohortAnalysis: React.FC = () => {
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="week" stroke="#666" />
-                <YAxis stroke="#666" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="week" stroke="#64748b" style={{ fontSize: '14px' }} />
+                <YAxis stroke="#64748b" style={{ fontSize: '14px' }} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
                     borderRadius: '8px',
+                    color: '#fff'
                   }}
                 />
                 <Area
                   type="monotone"
                   dataKey="retention"
                   stroke="#3b82f6"
+                  strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorRetention)"
                 />
@@ -417,18 +421,19 @@ const CohortAnalysis: React.FC = () => {
           </div>
 
           {/* User Count Over Time */}
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Active Users</h2>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Active Users</h2>
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={retentionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="week" stroke="#666" />
-                <YAxis stroke="#666" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="week" stroke="#64748b" style={{ fontSize: '14px' }} />
+                <YAxis stroke="#64748b" style={{ fontSize: '14px' }} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
                     borderRadius: '8px',
+                    color: '#fff'
                   }}
                 />
                 <Legend />
@@ -436,9 +441,9 @@ const CohortAnalysis: React.FC = () => {
                   type="monotone"
                   dataKey="users"
                   stroke="#10b981"
-                  strokeWidth={2}
-                  dot={{ fill: '#10b981', r: 4 }}
-                  activeDot={{ r: 6 }}
+                  strokeWidth={3}
+                  dot={{ fill: '#10b981', r: 5 }}
+                  activeDot={{ r: 7 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -450,12 +455,12 @@ const CohortAnalysis: React.FC = () => {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Create New Cohort</h2>
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-2xl font-bold text-slate-900">Create New Cohort</h2>
             </div>
             <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Cohort Name *
                 </label>
                 <input
@@ -463,12 +468,12 @@ const CohortAnalysis: React.FC = () => {
                   value={newCohort.name}
                   onChange={(e) => setNewCohort({ ...newCohort, name: e.target.value })}
                   placeholder="e.g., Mobile Users from US"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Description
                 </label>
                 <textarea
@@ -476,18 +481,18 @@ const CohortAnalysis: React.FC = () => {
                   onChange={(e) => setNewCohort({ ...newCohort, description: e.target.value })}
                   placeholder="Optional description"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-slate-700">
                     Conditions *
                   </label>
                   <button
                     onClick={addCondition}
-                    className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-sm"
+                    className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all flex items-center gap-1 text-sm font-medium"
                   >
                     <Plus className="w-4 h-4" />
                     Add Condition
@@ -495,9 +500,9 @@ const CohortAnalysis: React.FC = () => {
                 </div>
                 <div className="space-y-4">
                   {newCohort.conditions.map((condition, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div key={index} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-gray-900">Condition {index + 1}</h4>
+                        <h4 className="font-semibold text-slate-900">Condition {index + 1}</h4>
                         {newCohort.conditions.length > 1 && (
                           <button
                             onClick={() => removeCondition(index)}
@@ -511,7 +516,7 @@ const CohortAnalysis: React.FC = () => {
                         <select
                           value={condition.field}
                           onChange={(e) => updateCondition(index, 'field', e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         >
                           <option value="device.deviceType">Device Type</option>
                           <option value="device.browser">Browser</option>
@@ -523,7 +528,7 @@ const CohortAnalysis: React.FC = () => {
                         <select
                           value={condition.operator}
                           onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         >
                           <option value="equals">Equals</option>
                           <option value="not_equals">Not Equals</option>
@@ -535,7 +540,7 @@ const CohortAnalysis: React.FC = () => {
                           value={condition.value}
                           onChange={(e) => updateCondition(index, 'value', e.target.value)}
                           placeholder="Value"
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                       </div>
                     </div>
@@ -543,17 +548,17 @@ const CohortAnalysis: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-6 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={createCohort}
                 disabled={!newCohort.name || newCohort.conditions.length === 0}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Cohort
               </button>
@@ -561,7 +566,8 @@ const CohortAnalysis: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </main>
   );
 };
 

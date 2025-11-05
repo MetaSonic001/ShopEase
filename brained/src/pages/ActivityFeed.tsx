@@ -69,7 +69,7 @@ const eventColors: Record<string, string> = {
   hover: 'bg-yellow-100 text-yellow-800',
   input: 'bg-pink-100 text-pink-800',
   submit: 'bg-orange-100 text-orange-800',
-  custom: 'bg-gray-100 text-gray-800',
+  custom: 'bg-slate-100 text-slate-800',
 };
 
 export default function ActivityFeed() {

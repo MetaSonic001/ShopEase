@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -13,10 +13,19 @@ import {
   BarChart3,
   ArrowRight,
   RefreshCw,
+  Download,
+  ArrowDownRight,
+  Clock,
+  Zap,
+  Target,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -79,6 +88,16 @@ const FunnelAnalysis: React.FC = () => {
       analyzeFunnel(selectedFunnel._id);
     }
   }, [selectedFunnel, dateRange]);
+
+  // Calculate metrics - must be before any early returns
+  const metrics = useMemo(() => {
+    if (analysisData.length === 0) return { entries: 0, completed: 0, rate: 0, dropoff: 0 };
+    const entries = analysisData[0].users;
+    const completed = analysisData[analysisData.length - 1].users;
+    const rate = entries > 0 ? ((completed / entries) * 100).toFixed(1) : 0;
+    const dropoff = entries - completed;
+    return { entries, completed, rate, dropoff };
+  }, [analysisData]);
 
   const fetchFunnels = async () => {
     try {
@@ -190,240 +209,254 @@ const FunnelAnalysis: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Funnel Analysis</h1>
-            <p className="text-lg text-gray-600">
-              Track user journey through conversion funnels
-            </p>
+      <div className="border-b border-slate-200/50 bg-white sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Funnel Analysis</h1>
+              <p className="text-sm text-slate-600 mt-1">Track user journey through conversion funnels</p>
+            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Create Funnel
+            </button>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg"
-          >
-            <Plus className="w-5 h-5" />
-            Create Funnel
-          </button>
+
+          {/* Filters */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-3 py-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <select
+                value={selectedFunnel?._id || ''}
+                onChange={(e) => {
+                  const funnel = funnels.find((f) => f._id === e.target.value);
+                  setSelectedFunnel(funnel || null);
+                }}
+                className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
+              >
+                {funnels.map((funnel) => (
+                  <option key={funnel._id} value={funnel._id}>
+                    {funnel.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-3 py-2">
+              <Calendar className="w-4 h-4 text-slate-500" />
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
+              >
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => selectedFunnel && analyzeFunnel(selectedFunnel._id)}
+              className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+
+            {selectedFunnel && (
+              <button
+                onClick={() => deleteFunnel(selectedFunnel._id)}
+                className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2 ml-auto text-sm font-medium"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Funnel Selector */}
-      <div className="mb-6 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-500" />
-          <select
-            value={selectedFunnel?._id || ''}
-            onChange={(e) => {
-              const funnel = funnels.find((f) => f._id === e.target.value);
-              setSelectedFunnel(funnel || null);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {funnels.map((funnel) => (
-              <option key={funnel._id} value={funnel._id}>
-                {funnel.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {!selectedFunnel && funnels.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-slate-200">
+            <BarChart3 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">No Funnels Yet</h3>
+            <p className="text-slate-600 mb-6">
+              Create your first funnel to start tracking user conversion paths
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2 font-medium"
+            >
+              <Plus className="w-5 h-5" />
+              Create Your First Funnel
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Total Entries</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{formatNumber(metrics.entries)}</p>
+                  </div>
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Users who started the funnel</p>
+              </div>
 
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-gray-500" />
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
-        </div>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Completed</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{formatNumber(metrics.completed)}</p>
+                  </div>
+                  <div className="p-2 bg-green-50 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Successful conversions</p>
+              </div>
 
-        <button
-          onClick={() => selectedFunnel && analyzeFunnel(selectedFunnel._id)}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Conversion Rate</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{metrics.rate}%</p>
+                  </div>
+                  <div className="p-2 bg-purple-50 rounded-lg">
+                    <Target className="w-5 h-5 text-purple-600" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Overall funnel conversion</p>
+              </div>
 
-        {selectedFunnel && (
-          <button
-            onClick={() => deleteFunnel(selectedFunnel._id)}
-            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2 ml-auto"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete Funnel
-          </button>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Total Dropoff</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{formatNumber(metrics.dropoff)}</p>
+                  </div>
+                  <div className="p-2 bg-red-50 rounded-lg">
+                    <TrendingDown className="w-5 h-5 text-red-600" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Users who left the funnel</p>
+              </div>
+            </div>
+
+            {/* Funnel Steps */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-8">
+              <h2 className="text-lg font-semibold text-slate-900 mb-6">Funnel Steps</h2>
+              <div className="space-y-4">
+                {analysisData.map((step, index) => (
+                  <div key={index} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-slate-900">{step.stepName}</h3>
+                          <p className="text-xs text-slate-500">
+                            {formatNumber(step.users)} users
+                            {step.avgTimeToNext && index < analysisData.length - 1 && (
+                              <span className="ml-2">• Avg time: {formatTime(step.avgTimeToNext)}</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-slate-900">{step.conversionRate.toFixed(1)}%</p>
+                        {step.dropoffRate > 0 && (
+                          <p className="text-xs text-red-600 flex items-center gap-1">
+                            <TrendingDown className="w-3 h-3" />
+                            {step.dropoffRate.toFixed(1)}% dropoff
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="h-3 rounded-full transition-all duration-500 bg-gradient-to-r from-blue-500 to-blue-600"
+                          style={{ width: `${step.conversionRate}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    {index < analysisData.length - 1 && (
+                      <div className="flex justify-center py-2">
+                        <ArrowDownRight className="w-5 h-5 text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bar Chart */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-6">Step Comparison</h2>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={analysisData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="stepName" stroke="#94a3b8" style={{ fontSize: '12px' }} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #475569',
+                      borderRadius: '8px',
+                      color: '#fff',
+                    }}
+                  />
+                  <Bar dataKey="users" radius={[8, 8, 0, 0]}>
+                    {analysisData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getBarColor(entry.conversionRate)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
         )}
       </div>
 
-      {!selectedFunnel && funnels.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Funnels Yet</h3>
-          <p className="text-gray-600 mb-6">
-            Create your first funnel to start tracking user conversion paths
-          </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Create Your First Funnel
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-600">Total Entries</p>
-                <Users className="w-5 h-5 text-blue-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {analysisData.length > 0 ? formatNumber(analysisData[0].users) : 0}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-600">Completed</p>
-                <TrendingUp className="w-5 h-5 text-green-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {analysisData.length > 0
-                  ? formatNumber(analysisData[analysisData.length - 1].users)
-                  : 0}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-                <BarChart3 className="w-5 h-5 text-purple-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">{getTotalConversionRate()}%</p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-600">Total Dropoff</p>
-                <TrendingDown className="w-5 h-5 text-red-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {analysisData.length > 0
-                  ? formatNumber(
-                      analysisData[0].users - analysisData[analysisData.length - 1].users
-                    )
-                  : 0}
-              </p>
-            </div>
-          </div>
-
-          {/* Funnel Visualization */}
-          <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Funnel Steps</h2>
-            <div className="space-y-4">
-              {analysisData.map((step, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{step.stepName}</h3>
-                        <p className="text-sm text-gray-500">
-                          {formatNumber(step.users)} users
-                          {step.avgTimeToNext && index < analysisData.length - 1 && (
-                            <span className="ml-2">
-                              • Avg time: {formatTime(step.avgTimeToNext)}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">
-                        {step.conversionRate.toFixed(1)}%
-                      </p>
-                      {step.dropoffRate > 0 && (
-                        <p className="text-sm text-red-600 flex items-center gap-1">
-                          <TrendingDown className="w-4 h-4" />
-                          {step.dropoffRate.toFixed(1)}% dropoff
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                    <div
-                      className="h-4 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${step.conversionRate}%`,
-                        backgroundColor: getBarColor(step.conversionRate),
-                      }}
-                    ></div>
-                  </div>
-                  {index < analysisData.length - 1 && (
-                    <div className="flex justify-center my-2">
-                      <ArrowRight className="w-6 h-6 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Bar Chart */}
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Step Comparison</h2>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={analysisData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="stepName" stroke="#666" />
-                <YAxis stroke="#666" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar dataKey="users" radius={[8, 8, 0, 0]}>
-                  {analysisData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={getBarColor(entry.conversionRate)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
-
       {/* Create Funnel Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Create New Funnel</h2>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900">Create New Funnel</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Funnel Name *
                 </label>
                 <input
@@ -431,12 +464,12 @@ const FunnelAnalysis: React.FC = () => {
                   value={newFunnel.name}
                   onChange={(e) => setNewFunnel({ ...newFunnel, name: e.target.value })}
                   placeholder="e.g., Checkout Flow"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Description
                 </label>
                 <textarea
@@ -444,32 +477,37 @@ const FunnelAnalysis: React.FC = () => {
                   onChange={(e) => setNewFunnel({ ...newFunnel, description: e.target.value })}
                   placeholder="Optional description"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 />
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <label className="block text-sm font-medium text-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-slate-700">
                     Funnel Steps *
                   </label>
                   <button
                     onClick={addStep}
-                    className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-sm"
+                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5 text-sm font-medium"
                   >
                     <Plus className="w-4 h-4" />
                     Add Step
                   </button>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {newFunnel.steps.map((step, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div key={index} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-gray-900">Step {index + 1}</h4>
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+                            {index + 1}
+                          </div>
+                          <h4 className="font-semibold text-slate-900">Step {index + 1}</h4>
+                        </div>
                         {newFunnel.steps.length > 1 && (
                           <button
                             onClick={() => removeStep(index)}
-                            className="text-red-600 hover:text-red-700"
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -481,12 +519,12 @@ const FunnelAnalysis: React.FC = () => {
                           value={step.name}
                           onChange={(e) => updateStep(index, 'name', e.target.value)}
                           placeholder="Step name"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white transition-colors"
                         />
                         <select
                           value={step.eventType}
                           onChange={(e) => updateStep(index, 'eventType', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white transition-colors"
                         >
                           <option value="pageview">Page View</option>
                           <option value="click">Click</option>
@@ -499,7 +537,7 @@ const FunnelAnalysis: React.FC = () => {
                             value={step.pageURL || ''}
                             onChange={(e) => updateStep(index, 'pageURL', e.target.value)}
                             placeholder="Page URL (e.g., /checkout)"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white transition-colors"
                           />
                         )}
                         {(step.eventType === 'click' || step.eventType === 'submit') && (
@@ -508,7 +546,7 @@ const FunnelAnalysis: React.FC = () => {
                             value={step.elementSelector || ''}
                             onChange={(e) => updateStep(index, 'elementSelector', e.target.value)}
                             placeholder="Element selector (e.g., .add-to-cart)"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white transition-colors"
                           />
                         )}
                       </div>
@@ -517,17 +555,17 @@ const FunnelAnalysis: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-5 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700"
               >
                 Cancel
               </button>
               <button
                 onClick={createFunnel}
                 disabled={!newFunnel.name || newFunnel.steps.length === 0}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
               >
                 Create Funnel
               </button>
@@ -535,7 +573,7 @@ const FunnelAnalysis: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 };
 
