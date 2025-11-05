@@ -117,7 +117,7 @@ exports.getDashboardOverview = async (req, res) => {
         },
         {
           $group: {
-            _id: '$device.type',
+            _id: '$device.deviceType',
             count: { $sum: 1 },
           },
         },

@@ -201,7 +201,11 @@ mongoose
   .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
     console.log('Connected to MongoDB');
-    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log('🔄 Server ready - trackingRoutes.js loaded with PACKED EVENT SUPPORT');
+      console.log('📝 Restart timestamp:', new Date().toISOString());
+    });
   })
   .catch((err) => {
     console.error('Failed to connect to MongoDB', err);

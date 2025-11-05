@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as rrweb from 'rrweb';
+import SessionRecorder from './sessionRecorder';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -43,15 +43,7 @@ class AnalyticsManager {
   private scrollThrottle: number = 500;
 
   // Session recording (rrweb)
-  private isRecording: boolean = false;
-  private recordingEvents: any[] = [];
-  private recordStartTime: number = 0;
-  private rrwebStopFn: (() => void) | undefined = undefined;
-
-  // Console logs and network tracking
-  private consoleLogs: any[] = [];
-  private networkRequests: any[] = [];
-  private performanceMetrics: any[] = [];
+  private sessionRecorder: SessionRecorder | null = null;
 
   // Engagement tracking
   private pageLoadTime: number = 0;
@@ -114,13 +106,7 @@ class AnalyticsManager {
     this.startEngagementTracking();
     this.trackPageView();
 
-    // Intercept console methods
-    this.interceptConsole();
-
-    // Intercept network requests
-    this.interceptNetworkRequests();
-
-    // Start session recording if enabled
+    // Start session recording if enabled (SessionRecorder handles console/network interception)
     if (this.config.enableSessionRecording) {
       this.startSessionRecording();
     }
@@ -486,314 +472,40 @@ class AnalyticsManager {
     }, 1000);
   }
 
-  // Console interception
-  private interceptConsole(): void {
-    const originalConsole = {
-      log: console.log,
-      warn: console.warn,
-      error: console.error,
-      info: console.info,
-      debug: console.debug,
-    };
-
-    const captureConsole = (level: string, originalMethod: any) => {
-      return (...args: any[]) => {
-        // Call original method
-        originalMethod.apply(console, args);
-
-        // Capture for replay
-        const logEntry = {
-          level,
-          message: args.map(arg => {
-            try {
-              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-            } catch {
-              return String(arg);
-            }
-          }).join(' '),
-          timestamp: Date.now() - this.recordStartTime,
-          trace: level === 'error' ? new Error().stack : undefined,
-        };
-
-        this.consoleLogs.push(logEntry);
-
-        // Also send as event
-        if (level === 'error' || level === 'warn') {
-          this.queueEvent({
-            eventType: 'custom',
-            eventName: `console_${level}`,
-            pageURL: window.location.href,
-            metadata: {
-              message: logEntry.message,
-              trace: logEntry.trace,
-              timestamp: logEntry.timestamp,
-            },
-          });
-        }
-      };
-    };
-
-    console.log = captureConsole('log', originalConsole.log);
-    console.warn = captureConsole('warn', originalConsole.warn);
-    console.error = captureConsole('error', originalConsole.error);
-    console.info = captureConsole('info', originalConsole.info);
-    console.debug = captureConsole('debug', originalConsole.debug);
-  }
-
-  // Network request interception
-  private interceptNetworkRequests(): void {
-    // Intercept fetch
-    const originalFetch = window.fetch;
-    const analyticsManager = this;
-
-    window.fetch = async function (...args: Parameters<typeof fetch>) {
-      const startTime = Date.now();
-      const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
-      const method = args[1]?.method || 'GET';
-
-      try {
-        const response = await originalFetch.apply(this, args);
-        const duration = Date.now() - startTime;
-
-        const requestData = {
-          type: 'fetch',
-          url,
-          method,
-          status: response.status,
-          statusText: response.statusText,
-          duration,
-          timestamp: Date.now() - analyticsManager.recordStartTime,
-          size: response.headers.get('content-length') || 'unknown',
-        };
-
-        analyticsManager.networkRequests.push(requestData);
-
-        // Track failed requests
-        if (response.status >= 400) {
-          analyticsManager.queueEvent({
-            eventType: 'custom',
-            eventName: 'network_error',
-            pageURL: window.location.href,
-            metadata: requestData,
-          });
-        }
-
-        return response;
-      } catch (error: any) {
-        const duration = Date.now() - startTime;
-
-        const requestData = {
-          type: 'fetch',
-          url,
-          method,
-          status: 0,
-          statusText: 'Failed',
-          error: error.message,
-          duration,
-          timestamp: Date.now() - analyticsManager.recordStartTime,
-        };
-
-        analyticsManager.networkRequests.push(requestData);
-
-        analyticsManager.queueEvent({
-          eventType: 'custom',
-          eventName: 'network_error',
-          pageURL: window.location.href,
-          metadata: requestData,
-        });
-
-        throw error;
-      }
-    };
-
-    // Intercept XMLHttpRequest
-    const originalXHROpen = XMLHttpRequest.prototype.open;
-    const originalXHRSend = XMLHttpRequest.prototype.send;
-
-    XMLHttpRequest.prototype.open = function (
-      method: string,
-      url: string | URL,
-      async?: boolean,
-      username?: string | null,
-      password?: string | null
-    ) {
-      (this as any)._analyticsMethod = method;
-      (this as any)._analyticsUrl = url;
-      (this as any)._analyticsStartTime = Date.now();
-
-      // Forward the call to the original open with all parameters (explicitly passing undefined for missing optionals)
-      // Use apply with any-typed array to satisfy TypeScript's expected arity for the original function.
-      return originalXHROpen.apply(this, [method, url, async, username, password] as any);
-    };
-
-    XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
-      const xhr = this;
-      const startTime = (xhr as any)._analyticsStartTime;
-
-      xhr.addEventListener('load', () => {
-        const duration = Date.now() - startTime;
-        const requestData = {
-          type: 'xhr',
-          url: (xhr as any)._analyticsUrl,
-          method: (xhr as any)._analyticsMethod,
-          status: xhr.status,
-          statusText: xhr.statusText,
-          duration,
-          timestamp: Date.now() - analyticsManager.recordStartTime,
-        };
-
-        analyticsManager.networkRequests.push(requestData);
-
-        if (xhr.status >= 400) {
-          analyticsManager.queueEvent({
-            eventType: 'custom',
-            eventName: 'network_error',
-            pageURL: window.location.href,
-            metadata: requestData,
-          });
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        const duration = Date.now() - startTime;
-        const requestData = {
-          type: 'xhr',
-          url: (xhr as any)._analyticsUrl,
-          method: (xhr as any)._analyticsMethod,
-          status: 0,
-          statusText: 'Failed',
-          duration,
-          timestamp: Date.now() - analyticsManager.recordStartTime,
-        };
-
-        analyticsManager.networkRequests.push(requestData);
-
-        analyticsManager.queueEvent({
-          eventType: 'custom',
-          eventName: 'network_error',
-          pageURL: window.location.href,
-          metadata: requestData,
-        });
-      });
-
-      return originalXHRSend.call(this, body);
-    };
-  }
-
-  // Session recording methods (rrweb integration)
+  // Session recording methods (using SessionRecorder)
   private startSessionRecording(): void {
-    if (this.isRecording) return;
-
-    this.isRecording = true;
-    this.recordStartTime = Date.now();
-    this.recordingEvents = [];
+    if (this.sessionRecorder) {
+      console.log('[AnalyticsManager] Session recording already started');
+      return;
+    }
 
     try {
-      // Start rrweb recording
-      this.rrwebStopFn = rrweb.record({
-        emit: (event) => {
-          // Add event to queue
-          this.recordEvent(event);
-        },
-        maskAllInputs: this.config.privacy?.maskAllInputs ?? true,
-        maskTextClass: this.config.privacy?.maskTextClass ?? 'mask',
-        blockClass: this.config.privacy?.blockClass ?? 'block',
-        // Sampling configuration for performance
-        mousemoveWait: 50,
-        sampling: {
-          mouseInteraction: true,
-          scroll: 150,
-          input: 'last',
-        },
-        recordCanvas: true,
-        collectFonts: true,
+      this.sessionRecorder = new SessionRecorder({
+        sessionId: this.sessionId,
+        userId: this.userId || undefined,
+        projectId: this.projectId,
+        checkoutEveryNms: 5 * 60 * 1000, // Checkpoint every 5 minutes for error recovery
       });
-
-      // Set up periodic flush for recording events
-      const recordingFlushInterval = window.setInterval(() => {
-        this.flushRecordingEvents();
-      }, 5000);
-
-      // Store interval ID to clear later
-      (this as any).recordingFlushInterval = recordingFlushInterval;
-
-      console.log('Session recording started with rrweb');
+      this.sessionRecorder.start();
+      console.log('[AnalyticsManager] Session recording started via SessionRecorder with checkpoints');
     } catch (error) {
-      console.error('Failed to start rrweb recording:', error);
-      this.isRecording = false;
+      console.error('[AnalyticsManager] Failed to start session recording:', error);
+      this.sessionRecorder = null;
     }
   }
 
   private stopSessionRecording(): void {
-    if (!this.isRecording) return;
-
-    this.isRecording = false;
-
-    // Stop rrweb recording
-    if (this.rrwebStopFn) {
-      this.rrwebStopFn();
-      this.rrwebStopFn = undefined;
+    if (!this.sessionRecorder) {
+      return;
     }
 
-    // Flush remaining events
-    this.flushRecordingEvents();
-
-    if ((this as any).recordingFlushInterval) {
-      clearInterval((this as any).recordingFlushInterval);
+    try {
+      this.sessionRecorder.stop();
+      this.sessionRecorder = null;
+      console.log('[AnalyticsManager] Session recording stopped');
+    } catch (error) {
+      console.error('[AnalyticsManager] Failed to stop session recording:', error);
     }
-
-    // Mark session as complete (silently fail if session doesn't exist)
-    axios.post(`${API_URL}/api/tracking/session/${this.sessionId}/complete`).catch(() => {
-      // Session may not exist yet, that's ok
-    });
-
-    console.log('Session recording stopped');
-  }
-
-  private recordEvent(event: any): void {
-    if (!this.isRecording) return;
-
-    this.recordingEvents.push({
-      ...event,
-      timestamp: Date.now() - this.recordStartTime,
-    });
-  }
-
-  private flushRecordingEvents(): void {
-    if (this.recordingEvents.length === 0) return;
-
-    const events = [...this.recordingEvents];
-    const consoleLogs = [...this.consoleLogs];
-    const networkRequests = [...this.networkRequests];
-
-    this.recordingEvents = [];
-    this.consoleLogs = [];
-    this.networkRequests = [];
-
-    axios
-      .post(`${API_URL}/api/tracking/session`, {
-        sessionId: this.sessionId,
-        userId: this.userId,
-        projectId: this.projectId,
-        events,
-        consoleLogs,
-        networkRequests,
-        metadata: {
-          url: window.location.href,
-          title: document.title,
-          device: {
-            type: this.getDeviceType(),
-            browser: navigator.userAgent,
-            screen: `${window.screen.width}x${window.screen.height}`,
-          },
-        },
-      })
-      .catch((err) => {
-        console.error('Failed to flush recording events:', err);
-        this.recordingEvents.unshift(...events);
-        this.consoleLogs.unshift(...consoleLogs);
-        this.networkRequests.unshift(...networkRequests);
-      });
   }
 
   // Public API

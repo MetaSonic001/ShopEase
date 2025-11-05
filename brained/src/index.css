@@ -233,4 +233,23 @@ button:focus-visible {
   button:not([class*="bg-"]):hover {
     background-color: #e5e7eb;
   }
+}  
+/* rrweb session replay player styling */ 
+/* .replayer-wrapper {  
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform-origin: center center !important;
+  display: block !important;
+ 
+} 
+  
+.replayer-wrapper iframe,
+.replayer-wrapper canvas {  
+  display: block !important;
+
 }
+
+.replayer-wrapper .replayer-mouse {
+  position: absolute !important;
+} */

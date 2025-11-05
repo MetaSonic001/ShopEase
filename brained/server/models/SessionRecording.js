@@ -33,9 +33,7 @@ const sessionRecordingSchema = new mongoose.Schema({
   
   // Device info
   device: {
-    type: {
-      type: String, // mobile, desktop, tablet
-    },
+    deviceType: String, // Changed from 'type' to avoid Mongoose conflict
     browser: String,
     os: String,
     screen: String,
@@ -43,58 +41,28 @@ const sessionRecordingSchema = new mongoose.Schema({
     viewport: String,
   },
   
-  // Recording events (cursor movements, clicks, scrolls, etc.)
-  events: [{
-    type: {
-      type: String,
-      required: true,
-      // mousemove, click, scroll, resize, input, etc.
+  // Session metadata
+  metadata: {
+    url: String,
+    title: String,
+    device: {
+      deviceType: String, // Changed from 'type' to avoid conflict
+      browser: String,
+      os: String,
+      screen: String,
     },
-    timestamp: {
-      type: Number, // milliseconds from start
-      required: true,
-    },
-    data: {
-      // For mousemove: x, y
-      x: Number,
-      y: Number,
-      
-      // For click: x, y, element
-      element: String,
-      target: String,
-      
-      // For scroll: x, y, scrollTop, scrollLeft
-      scrollTop: Number,
-      scrollLeft: Number,
-      
-      // For resize: width, height
-      width: Number,
-      height: Number,
-      
-      // For input: value (masked for security)
-      value: String,
-      inputType: String,
-      
-      // For page change: url, title
-      url: String,
-      title: String,
-    },
-  }],
+  },
   
-  // DOM snapshots (initial and mutations)
-  snapshots: [{
-    timestamp: Number,
-    type: String, // full, incremental
-    html: String, // stored as compressed/sanitized HTML
-    mutations: mongoose.Schema.Types.Mixed,
-  }],
+  // rrweb events - stored as compressed packed strings for efficiency
+  // Each string is a compressed chunk of events created by rrweb's pack() function
+  // These will be unpacked during playback using rrweb's unpack() function
+  events: [String], // Array of compressed event strings
   
   // Console logs (optional)
   consoleLogs: [{
     timestamp: Number,
-    level: String, // log, warn, error
+    level: String, // log, warn, error, info
     message: String,
-    args: [mongoose.Schema.Types.Mixed],
   }],
   
   // Network requests (optional)
@@ -104,7 +72,8 @@ const sessionRecordingSchema = new mongoose.Schema({
     url: String,
     status: Number,
     duration: Number,
-    size: Number,
+    type: String, // fetch, xhr
+    error: String,
   }],
   
   // Errors captured
@@ -112,7 +81,10 @@ const sessionRecordingSchema = new mongoose.Schema({
     timestamp: Number,
     message: String,
     stack: String,
-    type: String,
+    filename: String,
+    line: Number,
+    column: Number,
+    type: String, // error, unhandledrejection
   }],
   
   // Statistics
@@ -148,5 +120,10 @@ const sessionRecordingSchema = new mongoose.Schema({
 sessionRecordingSchema.index({ projectId: 1, startTime: -1 });
 sessionRecordingSchema.index({ userId: 1, startTime: -1 });
 sessionRecordingSchema.index({ hasErrors: 1, startTime: -1 });
+
+// Delete existing model to prevent schema caching issues
+if (mongoose.models.SessionRecording) {
+  delete mongoose.models.SessionRecording;
+}
 
 module.exports = mongoose.model('SessionRecording', sessionRecordingSchema);

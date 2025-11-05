@@ -1,4 +1,5 @@
 import axios from 'axios';
+import SessionRecorder from './sessionRecorder';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -24,12 +25,6 @@ interface EventData {
   };
 }
 
-interface RecordingEvent {
-  type: 'mousemove' | 'click' | 'scroll' | 'resize' | 'input' | 'pageChange';
-  timestamp: number;
-  data: any;
-}
-
 interface SuperProperties {
   [key: string]: any;
 }
@@ -38,12 +33,8 @@ class TrackingClient {
   private sessionId: string | null = null;
   private userId: string | null = null;
   private isRecording: boolean = false;
-  private recordingBuffer: RecordingEvent[] = [];
+  private sessionRecorder: SessionRecorder | null = null;
   private superProperties: SuperProperties = {};
-  private flushInterval: number = 5000; // Flush every 5 seconds
-  private flushTimer: number | null = null;
-  private lastMouseMove: number = 0;
-  private mouseMoveThrottle: number = 100; // Throttle mousemove to 100ms
   private isAdmin: boolean = false;
 
   constructor() {
@@ -146,39 +137,6 @@ class TrackingClient {
           vh: (e.clientY / window.innerHeight) * 100,
         },
       });
-
-      if (this.isRecording) {
-        this.addRecordingEvent({
-          type: 'click',
-          timestamp: Date.now(),
-          data: {
-            x: e.clientX,
-            y: e.clientY,
-            element: target.tagName.toLowerCase(),
-            id: target.id,
-            className: target.className,
-          },
-        });
-      }
-    });
-
-    // Mouse move tracking (throttled)
-    document.addEventListener('mousemove', (e) => {
-      if (!this.isRecording) return;
-      if (!this.shouldTrack()) return; // Skip tracking for admins
-
-      const now = Date.now();
-      if (now - this.lastMouseMove < this.mouseMoveThrottle) return;
-      this.lastMouseMove = now;
-
-      this.addRecordingEvent({
-        type: 'mousemove',
-        timestamp: now,
-        data: {
-          x: e.clientX,
-          y: e.clientY,
-        },
-      });
     });
 
     // Scroll tracking
@@ -198,18 +156,6 @@ class TrackingClient {
             scrollDepth: Math.round(scrollDepth),
           },
         });
-
-        if (this.isRecording) {
-          this.addRecordingEvent({
-            type: 'scroll',
-            timestamp: Date.now(),
-            data: {
-              scrollY: window.scrollY,
-              scrollX: window.scrollX,
-              scrollDepth: Math.round(scrollDepth),
-            },
-          });
-        }
       }, 500);
     });
 
@@ -258,33 +204,6 @@ class TrackingClient {
           formData,
         },
       });
-    });
-
-    // Intercept console errors
-    const originalError = console.error;
-    console.error = (...args) => {
-      if (this.isRecording) {
-        this.addConsoleLog({
-          level: 'error',
-          message: args.map(arg => String(arg)).join(' '),
-          timestamp: Date.now(),
-        });
-      }
-      originalError.apply(console, args);
-    };
-
-    // Window resize
-    window.addEventListener('resize', () => {
-      if (this.isRecording) {
-        this.addRecordingEvent({
-          type: 'resize',
-          timestamp: Date.now(),
-          data: {
-            width: window.innerWidth,
-            height: window.innerHeight,
-          },
-        });
-      }
     });
   }
 
@@ -601,7 +520,9 @@ class TrackingClient {
         .catch((err) => {
           console.error('❌ Failed to send performance metrics', err);
         });
-    };    // Initialize tracking
+    };
+
+    // Initialize tracking
     trackTTFB();
     trackFCP();
     trackLCP();
@@ -686,20 +607,28 @@ class TrackingClient {
     localStorage.setItem('pagepulse_superProps', JSON.stringify(this.superProperties));
   }
 
-  public startRecording(): void {
+  public startRecording(force: boolean = false): void {
     if (this.isRecording) return;
-    if (!this.shouldTrack()) return; // Don't record admin users or admin pages
+    // Allow manual recording start with force flag (for admin testing)
+    if (!force && !this.shouldTrack()) return; // Don't record admin users or admin pages
+    if (!this.sessionId) return;
 
     this.isRecording = true;
-    this.recordingBuffer = [];
 
-    // Start flush timer
-    this.flushTimer = setInterval(() => {
-      this.flushRecording();
-    }, this.flushInterval);
+    console.log('[TrackingClient] Starting recording for session:', this.sessionId, 'userId:', this.userId);
 
-    // Capture initial snapshot
-    this.captureSnapshot();
+    // Create and start session recorder
+    this.sessionRecorder = new SessionRecorder({
+      sessionId: this.sessionId,
+      userId: this.userId || 'anonymous',
+      projectId: 'default',
+      onError: (error) => {
+        console.error('[TrackingClient] Recording error:', error);
+      },
+      checkoutEveryNms: 5 * 60 * 1000, // 5 minutes
+    });
+
+    this.sessionRecorder.start();
 
     this.captureEvent({
       eventType: 'custom',
@@ -713,77 +642,16 @@ class TrackingClient {
 
     this.isRecording = false;
 
-    // Flush remaining events
-    this.flushRecording();
-
-    // Clear flush timer
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = null;
+    // Stop session recorder
+    if (this.sessionRecorder) {
+      this.sessionRecorder.stop();
+      this.sessionRecorder = null;
     }
 
     this.captureEvent({
       eventType: 'custom',
       eventName: 'recording_stopped',
       pageURL: window.location.href,
-    });
-  }
-
-  private addRecordingEvent(event: RecordingEvent): void {
-    this.recordingBuffer.push(event);
-
-    // Auto-flush if buffer is too large
-    if (this.recordingBuffer.length >= 100) {
-      this.flushRecording();
-    }
-  }
-
-  private flushRecording(): void {
-    if (this.recordingBuffer.length === 0 || !this.sessionId) return;
-
-    const events = [...this.recordingBuffer];
-    this.recordingBuffer = [];
-
-    axios.post(`${API_URL}/api/analytics/recording-events`, {
-      sessionId: this.sessionId,
-      events,
-    }).catch((err) => {
-      console.error('Failed to flush recording events', err);
-      // Put events back in buffer if failed
-      this.recordingBuffer.unshift(...events);
-    });
-  }
-
-  private captureSnapshot(): void {
-    if (!this.sessionId) return;
-
-    // Simple DOM snapshot (could be enhanced with a library like rrweb)
-    const snapshot = {
-      html: document.documentElement.outerHTML,
-      url: window.location.href,
-      timestamp: Date.now(),
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      },
-    };
-
-    axios.post(`${API_URL}/api/analytics/snapshot`, {
-      sessionId: this.sessionId,
-      snapshot,
-    }).catch((err) => {
-      console.error('Failed to capture snapshot', err);
-    });
-  }
-
-  private addConsoleLog(log: { level: string; message: string; timestamp: number }): void {
-    if (!this.sessionId) return;
-
-    axios.post(`${API_URL}/api/analytics/console`, {
-      sessionId: this.sessionId,
-      log,
-    }).catch((err) => {
-      console.error('Failed to log console message', err);
     });
   }
 

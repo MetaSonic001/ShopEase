@@ -50,6 +50,7 @@ interface Session {
   _id: string;
   sessionId: string;
   userId?: string;
+  userName?: string;
   metadata: {
     url: string;
     title: string;

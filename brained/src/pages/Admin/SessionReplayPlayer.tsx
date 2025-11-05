@@ -80,11 +80,24 @@ const SessionReplayPlayer: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get(`/api/analytics/recordings/${sessionId}`);
-      setRecording(response.data.recording);
+      const recordingData = response.data.recording;
+      
+      console.log('[SessionReplayPlayer] Fetched recording:', {
+        sessionId: recordingData.sessionId,
+        eventCount: recordingData.events?.length || 0,
+        hasConsoleLogs: !!recordingData.consoleLogs?.length,
+        hasNetworkRequests: !!recordingData.networkRequests?.length,
+        firstEvent: recordingData.events?.[0],
+        lastEvent: recordingData.events?.[recordingData.events?.length - 1],
+      });
+      
+      setRecording(recordingData);
       setError(null);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Failed to load recording');
+      const errorMessage = error.response?.data?.message || 'Failed to load recording';
+      console.error('[SessionReplayPlayer] Error fetching recording:', errorMessage, err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -486,12 +499,12 @@ const SessionReplayPlayer: React.FC = () => {
                         }`}
                     >
                       <div className="flex items-start gap-2">
-                        <Clock className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <Clock className="w-3 h-3 mt-0.5 shrink-0" />
                         <div className="flex-1 overflow-hidden">
                           <p className="text-xs text-gray-500 mb-1">
                             {formatTime((log.timestamp - recording.events[0]?.timestamp) / 1000)}
                           </p>
-                          <p className="break-words">{log.message}</p>
+                          <p className="wrap-break-word">{log.message}</p>
                         </div>
                       </div>
                     </div>

@@ -23,7 +23,7 @@ import { CartProvider } from "./context/CartContext";
 // New Analytics Pages
 import RealTimeAnalyticsDashboard from "./pages/Admin/RealTimeAnalyticsDashboard";
 import RecordingsList from "./pages/Admin/RecordingsList";
-import SessionReplayPlayer from "./pages/Admin/SessionReplayPlayer";
+import SessionReplayPlayer from "./pages/Admin/SessionReplayPlayerNew";
 import HeatmapVisualization from "./pages/Admin/HeatmapVisualization";
 import PerformanceAnalytics from "./pages/Admin/PerformanceAnalyticsDashboard";
 import FunnelAnalysis from "./pages/Admin/FunnelAnalysis";

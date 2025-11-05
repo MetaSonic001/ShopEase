@@ -45,7 +45,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const syncCart = React.useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        // No token, skip backend sync and just use local storage
+        return;
+      }
 
       setLoading(true);
 
@@ -73,8 +76,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setItems(backendItems);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(backendItems));
       }
-    } catch (error) {
-      console.error('Failed to sync cart:', error);
+    } catch (error: any) {
+      // Silently ignore 401 errors (user not authenticated)
+      if (error?.response?.status !== 401) {
+        console.error('Failed to sync cart:', error);
+      }
     } finally {
       setLoading(false);
     }

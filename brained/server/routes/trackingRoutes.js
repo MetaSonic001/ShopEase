@@ -11,28 +11,23 @@ const { enrichWithUserNames } = require('../utils/userEnricher');
 // Create or update session recording with rrweb events
 router.post('/session', async (req, res) => {
   try {
-    const { sessionId, userId, events, consoleLogs, networkRequests, metadata } = req.body;
+    const { sessionId, userId, packedEvents, consoleLogs, networkRequests, metadata } = req.body;
 
-    if (!sessionId || !events || !Array.isArray(events)) {
-      return res.status(400).json({ message: 'sessionId and events array are required' });
+    console.log('[/session] Received request:', { sessionId, userId, hasPacked: !!packedEvents });
+
+    if (!sessionId) {
+      return res.status(400).json({ message: 'sessionId is required' });
     }
-
-    // Check if URL is an admin path and reject tracking
-    if (metadata?.url) {
-      const url = metadata.url.toLowerCase();
-      if (url.includes('/admin') || url.includes('/login')) {
-        return res.status(200).json({ message: 'Admin paths not tracked' });
-      }
+    
+    if (!packedEvents || typeof packedEvents !== 'string' || packedEvents.length === 0) {
+      return res.status(400).json({ message: 'packedEvents string is required and must not be empty' });
     }
+    
+    console.log('[/session] Packed events validated. Length:', packedEvents.length);
 
-    // If userId is provided, check if user is admin
-    if (userId && userId !== 'anonymous') {
-      const user = await User.findById(userId).select('role');
-      if (user && user.role === 'admin') {
-        return res.status(200).json({ message: 'Admin users not tracked' });
-      }
-    }
-
+    // Note: We don't block admin paths for manual recordings
+    // Admin users may want to record their own sessions for testing
+    
     let session = await SessionRecording.findOne({ sessionId });
 
     if (!session) {
@@ -46,13 +41,15 @@ router.post('/session', async (req, res) => {
         consoleLogs: [],
         networkRequests: [],
         device: metadata?.device || {},
+        metadata: metadata || {},
         entryURL: metadata?.url || '',
         pagesVisited: metadata?.url ? [metadata?.url] : [],
       });
     }
 
-    // Add events to session
-    session.events.push(...events);
+    // Store packed events as a single compressed string
+    // The events array will contain the packed string
+    session.events.push(packedEvents);
 
     // Add console logs
     if (consoleLogs && Array.isArray(consoleLogs)) {
@@ -61,7 +58,12 @@ router.post('/session', async (req, res) => {
 
     // Add network requests
     if (networkRequests && Array.isArray(networkRequests)) {
-      session.networkRequests.push(...networkRequests);
+      try {
+        session.networkRequests.push(...networkRequests);
+      } catch (err) {
+        console.error('[/session] Error pushing network requests:', err.message);
+        console.error('[/session] Sample request:', networkRequests[0]);
+      }
     }
 
     // Update metadata
@@ -72,22 +74,23 @@ router.post('/session', async (req, res) => {
       }
       if (metadata.device) {
         session.device = { ...session.device, ...metadata.device };
+        session.metadata = metadata;
       }
     }
 
-    // Update stats
-    const clickEvents = events.filter((e) => e.type === 'click' || e.type === 3).length;
-    const scrollEvents = events.filter((e) => e.type === 'scroll').length;
-    const inputEvents = events.filter((e) => e.type === 'input' || e.type === 5).length;
-
+    // Update stats - for packed events we just count the chunks
     session.stats = session.stats || {};
-    session.stats.totalEvents = (session.stats.totalEvents || 0) + events.length;
-    session.stats.totalClicks = (session.stats.totalClicks || 0) + clickEvents;
-    session.stats.totalScrolls = (session.stats.totalScrolls || 0) + scrollEvents;
+    session.stats.totalEvents = (session.stats.totalEvents || 0) + 1; // Count each packed chunk
+    session.stats.lastUpdated = new Date();
 
     await session.save();
 
-    res.json({ message: 'Session events recorded', sessionId: session.sessionId });
+    res.json({ 
+      message: 'Session events recorded', 
+      sessionId: session.sessionId,
+      packedChunksAdded: 1,
+      totalChunks: session.events.length
+    });
   } catch (error) {
     console.error('Error recording session:', error);
     res.status(500).json({ message: 'Failed to record session', error: error.message });
@@ -101,7 +104,8 @@ router.post('/session/:sessionId/complete', async (req, res) => {
 
     const session = await SessionRecording.findOne({ sessionId });
     if (!session) {
-      return res.status(404).json({ message: 'Session not found' });
+      console.log('[/complete] Session not found, might have been a short recording:', sessionId);
+      return res.status(200).json({ message: 'Session not found or already completed' });
     }
 
     session.isComplete = true;
@@ -113,6 +117,7 @@ router.post('/session/:sessionId/complete', async (req, res) => {
 
     await session.save();
 
+    console.log('[/complete] Session marked complete:', sessionId);
     res.json({ message: 'Session completed', session });
   } catch (error) {
     console.error('Error completing session:', error);

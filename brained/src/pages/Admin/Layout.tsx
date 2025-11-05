@@ -66,10 +66,16 @@ const AdminLayout: React.FC = () => {
       try {
         const res = await api.post('/api/analytics/recording', { enabled: !isRec });
         setIsRec(!!res.data.enabled);
-        if (res.data.enabled) trackingClient.startRecording();
-        else trackingClient.stopRecording();
+        if (res.data.enabled) {
+          // Force recording start even for admins (testing purposes)
+          trackingClient.startRecording(true);
+          console.log('[Admin] Recording started manually');
+        } else {
+          trackingClient.stopRecording();
+          console.log('[Admin] Recording stopped');
+        }
       } catch (e) {
-        console.error(e);
+        console.error('[Admin] Failed to toggle recording:', e);
       } finally {
         setLoading(false);
       }

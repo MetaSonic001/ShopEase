@@ -70,7 +70,7 @@ const CohortAnalysis: React.FC = () => {
   const [newCohort, setNewCohort] = useState({
     name: '',
     description: '',
-    conditions: [{ field: 'device.type', operator: 'equals', value: '' }],
+    conditions: [{ field: 'device.deviceType', operator: 'equals', value: '' }],
   });
 
   useEffect(() => {
@@ -124,7 +124,7 @@ const CohortAnalysis: React.FC = () => {
       setNewCohort({
         name: '',
         description: '',
-        conditions: [{ field: 'device.type', operator: 'equals', value: '' }],
+        conditions: [{ field: 'device.deviceType', operator: 'equals', value: '' }],
       });
       fetchCohorts();
     } catch (err) {
@@ -147,7 +147,7 @@ const CohortAnalysis: React.FC = () => {
   const addCondition = () => {
     setNewCohort({
       ...newCohort,
-      conditions: [...newCohort.conditions, { field: 'device.type', operator: 'equals', value: '' }],
+      conditions: [...newCohort.conditions, { field: 'device.deviceType', operator: 'equals', value: '' }],
     });
   };
 
@@ -513,7 +513,7 @@ const CohortAnalysis: React.FC = () => {
                           onChange={(e) => updateCondition(index, 'field', e.target.value)}
                           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         >
-                          <option value="device.type">Device Type</option>
+                          <option value="device.deviceType">Device Type</option>
                           <option value="device.browser">Browser</option>
                           <option value="device.os">Operating System</option>
                           <option value="location.country">Country</option>

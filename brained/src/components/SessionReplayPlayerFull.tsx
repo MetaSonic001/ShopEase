@@ -33,6 +33,7 @@ interface SessionData {
     device: {
       type: string;
       browser: string;
+      os: string;
       screen: string;
     };
   };
@@ -88,8 +89,12 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
 
   useEffect(() => {
     if (!sessionData || !playerContainerRef.current) return;
-    // rrweb-player requires at least two events (e.g., Meta + FullSnapshot)
-    if (!Array.isArray(sessionData.events) || sessionData.events.length < 2) return;
+    
+    // Validate events array
+    if (!Array.isArray(sessionData.events) || sessionData.events.length < 2) {
+      console.warn('[SessionReplayPlayer] Not enough events to replay:', sessionData.events?.length);
+      return;
+    }
 
     try {
       // Clear previous player
@@ -97,7 +102,25 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
         playerContainerRef.current.innerHTML = '';
       }
 
+      // Sort events by timestamp to ensure correct order
       const sortedEvents = [...sessionData.events].sort((a, b) => (a?.timestamp || 0) - (b?.timestamp || 0));
+      
+      // Validate event structure
+      const hasValidEvents = sortedEvents.every(event => 
+        typeof event.type === 'number' && 
+        typeof event.timestamp === 'number' && 
+        event.data !== undefined
+      );
+      
+      if (!hasValidEvents) {
+        console.error('[SessionReplayPlayer] Invalid event structure detected');
+        setError('Invalid event format. Events must have type (number), timestamp (number), and data fields.');
+        return;
+      }
+
+      console.log('[SessionReplayPlayer] Initializing player with', sortedEvents.length, 'events');
+      console.log('[SessionReplayPlayer] First event:', sortedEvents[0]);
+      console.log('[SessionReplayPlayer] Last event:', sortedEvents[sortedEvents.length - 1]);
 
       const playerInstance = new rrwebPlayer({
         target: playerContainerRef.current,
@@ -107,12 +130,15 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
           width: 1024,
           height: 768,
           showController: true,
-          speedOption: [1, 2, 4, 8],
+          speedOption: [0.5, 1, 2, 4],
+          skipInactive: true, // Skip inactive periods
+          showWarning: true, // Show warnings for issues
           tags: {},
         },
       });
 
       setPlayer(playerInstance);
+      console.log('[SessionReplayPlayer] Player initialized successfully');
 
       return () => {
         try {
@@ -124,8 +150,8 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
         }
       };
     } catch (err: any) {
-      console.error('Error initializing player:', err);
-      setError('Failed to initialize replay player');
+      console.error('[SessionReplayPlayer] Error initializing player:', err);
+      setError(`Failed to initialize replay player: ${err.message || 'Unknown error'}`);
     }
   }, [sessionData]);
 
@@ -222,11 +248,14 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
       <Card className="w-full">
         <CardContent className="p-12">
           <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Not enough events to initialize the player yet.
+            <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <p className="text-sm font-medium">Not enough events to replay</p>
+            <p className="text-xs text-muted-foreground">
+              The replay requires at least 2 events (initial DOM snapshot + mutations).
             </p>
             <p className="text-xs text-muted-foreground">
-              The replay requires at least two events (initial snapshot). Try again in a few seconds.
+              Found {sessionData.events.length} event{sessionData.events.length !== 1 ? 's' : ''}.
+              Try recording a longer session with user interactions.
             </p>
             <Button variant="outline" onClick={fetchSessionData} className="mt-2">Refresh</Button>
           </div>
@@ -234,6 +263,22 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
       </Card>
     );
   }
+
+  // Calculate event type breakdown
+  const eventTypeBreakdown = sessionData.events.reduce((acc: Record<number, number>, event: any) => {
+    acc[event.type] = (acc[event.type] || 0) + 1;
+    return acc;
+  }, {});
+  
+  const eventTypeNames: Record<number, string> = {
+    0: 'DomContentLoaded',
+    1: 'Load',
+    2: 'FullSnapshot',
+    3: 'IncrementalSnapshot',
+    4: 'Meta',
+    5: 'Custom',
+    6: 'Plugin',
+  };
 
   return (
     <div className="space-y-4">
@@ -481,6 +526,9 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
                   <dd className="truncate" title={sessionData.metadata?.device?.browser}>
                     {sessionData.metadata?.device?.browser || 'Unknown'}
                   </dd>
+                  
+                  <dt className="text-muted-foreground">OS:</dt>
+                  <dd>{sessionData.metadata?.device?.os || 'Unknown'}</dd>
                 </dl>
               </div>
 
@@ -499,12 +547,26 @@ export default function SessionReplayPlayerFull({ sessionId, apiUrl }: SessionRe
                   </dl>
                 </div>
               )}
+              
+              <div>
+                <h3 className="font-semibold mb-2">Event Type Breakdown</h3>
+                <div className="space-y-2">
+                  {Object.entries(eventTypeBreakdown).map(([type, count]) => (
+                    <div key={type} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {eventTypeNames[parseInt(type)] || `Type ${type}`}:
+                      </span>
+                      <Badge variant="secondary">{count as number}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <div>
-                <h3 className="font-semibold mb-2">Raw Events JSON</h3>
+                <h3 className="font-semibold mb-2">Raw Events JSON (First 5)</h3>
                 <ScrollArea className="h-[300px] w-full border rounded p-4 bg-slate-50">
                   <pre className="text-xs font-mono">
-                    {JSON.stringify(sessionData.events, null, 2)}
+                    {JSON.stringify(sessionData.events.slice(0, 5), null, 2)}
                   </pre>
                 </ScrollArea>
               </div>
