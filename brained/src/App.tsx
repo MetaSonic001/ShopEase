@@ -72,6 +72,7 @@ function App() {
 
     if (!trackingEnabled || hasOptedOut || isAdmin) {
       analyticsManager.destroy();
+      trackingClient.stopRecording();
       return;
     }
 
@@ -84,10 +85,17 @@ function App() {
       });
     }
 
+    // Start session recording for non-admin users
+    if (!isAdmin && trackingEnabled && !hasOptedOut) {
+      console.log('[App] Starting session recording for user');
+      trackingClient.startRecording();
+    }
+
     // Cleanup on unmount
     return () => {
       // Flush any remaining events before unmount
       analyticsManager.destroy();
+      trackingClient.stopRecording();
     };
   }, [auth?.user]);
 
