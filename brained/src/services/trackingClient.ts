@@ -444,7 +444,7 @@ class TrackingClient {
       return originalOpen.apply(this, [method, url, ...rest] as any);
     };
 
-    XMLHttpRequest.prototype.send = function (...args: any[]) {
+    XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
       if ((this as any)._perfTrack) {
         (this as any)._perfTrack.startTime = performance.now();
 
@@ -463,7 +463,7 @@ class TrackingClient {
         });
       }
 
-      return originalSend.apply(this, args);
+      originalSend.call(this, body);
     };
 
     // Send metrics function
