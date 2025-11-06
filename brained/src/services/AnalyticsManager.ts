@@ -605,7 +605,9 @@ class AnalyticsManager {
 const analyticsManager = new AnalyticsManager({
   batchSize: 20,
   flushInterval: 5000,
-  enableSessionRecording: true,
+  // IMPORTANT: disable rrweb session recording by default.
+  // Live recording is controlled via the admin "Start Recording" action.
+  enableSessionRecording: false,
   enableHeatmaps: true,
 });
 

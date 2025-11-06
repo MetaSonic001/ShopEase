@@ -9,5 +9,7 @@ router.get('/:id', funnelController.getFunnelById);
 router.put('/:id', funnelController.updateFunnel);
 router.delete('/:id', funnelController.deleteFunnel);
 router.get('/:id/analyze', funnelController.analyzeFunnel);
+router.get('/:id/export/csv', funnelController.exportFunnelCSV);
+router.get('/:id/export/pdf', funnelController.exportFunnelPDF);
 
 module.exports = router;

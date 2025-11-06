@@ -160,6 +160,10 @@ router.get('/sessions', async (req, res) => {
       startDate,
       endDate,
       isComplete,
+      urlContains,
+      minDuration,
+      device,
+      hasRage, // expensive filter, optional
     } = req.query;
 
     const query = {};
@@ -174,14 +178,72 @@ router.get('/sessions', async (req, res) => {
       if (endDate) query.startTime.$lte = new Date(endDate);
     }
 
-    const sessions = await SessionRecording.find(query)
+    if (urlContains) {
+      query.pagesVisited = { $elemMatch: { $regex: urlContains, $options: 'i' } };
+    }
+    if (minDuration) {
+      query.duration = { $gte: parseInt(minDuration, 10) };
+    }
+    if (device) {
+      // device can be deviceType or browser/os; support deviceType primary
+      query['device.deviceType'] = device;
+    }
+
+    let sessions = await SessionRecording.find(query)
       .sort({ startTime: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit))
       .select('-events') // Exclude large events array from list
       .lean();
 
-    const total = await SessionRecording.countDocuments(query);
+    let total = await SessionRecording.countDocuments(query);
+
+    // Optional hasRage post-filter using UserInteraction heuristic
+    if (hasRage !== undefined) {
+      const desired = hasRage === 'true';
+      if (sessions.length > 0) {
+        const sessionIds = sessions.map(s => s.sessionId);
+        const clicks = await UserInteraction.find({ sessionId: { $in: sessionIds }, eventType: 'click' })
+          .select('sessionId timestamp metadata.element metadata.elementId metadata.className')
+          .sort({ sessionId: 1, timestamp: 1 })
+          .lean();
+        // Group by session + selector sig
+        const bySession = new Map();
+        const sigFor = (m) => (
+          (m?.elementId && `#${m.elementId}`) ||
+          (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0,2).join('.')}`) ||
+          (m?.element && String(m.element).toLowerCase()) ||
+          'unknown'
+        );
+        for (const c of clicks) {
+          const arr = bySession.get(c.sessionId) || [];
+          arr.push(c);
+          bySession.set(c.sessionId, arr);
+        }
+        const rageSessions = new Set();
+        bySession.forEach((arr, sid) => {
+          // sliding window within 3s with same selector count>=3
+          let i = 0;
+          for (let j = 0; j < arr.length; j++) {
+            const tj = new Date(arr[j].timestamp).getTime();
+            while (i < j && tj - new Date(arr[i].timestamp).getTime() > 3000) i++;
+            // check selector uniformity in window
+            const windowArr = arr.slice(i, j + 1);
+            const bySel = new Map();
+            windowArr.forEach(ev => {
+              const s = sigFor(ev.metadata || {});
+              bySel.set(s, (bySel.get(s) || 0) + 1);
+            });
+            if ([...bySel.values()].some(cnt => cnt >= 3)) {
+              rageSessions.add(sid);
+              break;
+            }
+          }
+        });
+        sessions = sessions.filter(s => desired ? rageSessions.has(s.sessionId) : !rageSessions.has(s.sessionId));
+        total = sessions.length; // in-page total after filter
+      }
+    }
 
     // Enrich sessions with user names
     const enrichedSessions = await enrichWithUserNames(sessions);
@@ -470,6 +532,316 @@ router.get('/interactions/top-clicks', async (req, res) => {
   }
 });
 
+// Attention map endpoint - aggregates attention by vertical viewport bands using scroll + click presence
+// GET /api/tracking/interactions/attention?pageURL&startDate&endDate&bands=8
+router.get('/interactions/attention', async (req, res) => {
+  try {
+    const { pageURL, startDate, endDate, bands = 8 } = req.query;
+    if (!pageURL) {
+      return res.status(400).json({ message: 'pageURL is required' });
+    }
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Fetch relevant interactions (scroll + click) for the page
+    const match = { pageURL, timestamp: { $gte: start, $lte: end }, eventType: { $in: ['scroll', 'click'] } };
+    const docs = await UserInteraction.find(match)
+      .select('eventType timestamp metadata.scrollDepth metadata.vh metadata.y')
+      .lean();
+
+    // If no viewport relative position recorded for clicks, try to derive bands from scroll depth only
+    const totalBands = parseInt(bands, 10) || 8;
+    const bandSize = 100 / totalBands; // each band covers this % of viewport height
+    const bandStats = Array.from({ length: totalBands }, (_, i) => ({
+      index: i,
+      from: Math.round(i * bandSize),
+      to: Math.round((i + 1) * bandSize),
+      scrollHits: 0,
+      clickHits: 0,
+      sessions: new Set(),
+      firstSeen: null,
+      lastSeen: null,
+    }));
+
+    // Aggregate
+    for (const d of docs) {
+      let pct = null;
+      if (d.eventType === 'scroll' && typeof d.metadata?.scrollDepth === 'number') {
+        pct = d.metadata.scrollDepth; // scrollDepth already 0-100
+      } else if (d.eventType === 'click') {
+        // vh metadata: percent of viewport height where click occurred
+        if (typeof d.metadata?.vh === 'number') pct = d.metadata.vh;
+        else if (typeof d.metadata?.y === 'number' && typeof window === 'undefined') {
+          // server side can't derive viewport percent without client height; ignore
+        }
+      }
+      if (pct == null) continue;
+      const bandIndex = Math.min(totalBands - 1, Math.max(0, Math.floor(pct / bandSize)));
+      const band = bandStats[bandIndex];
+      if (d.eventType === 'scroll') band.scrollHits += 1; else band.clickHits += 1;
+      // Use timestamp window for attention timeframe
+      if (!band.firstSeen || new Date(d.timestamp) < band.firstSeen) band.firstSeen = new Date(d.timestamp);
+      if (!band.lastSeen || new Date(d.timestamp) > band.lastSeen) band.lastSeen = new Date(d.timestamp);
+    }
+
+    // Compute composite attention score (weight scroll + clicks)
+    const maxScroll = Math.max(1, ...bandStats.map(b => b.scrollHits));
+    const maxClicks = Math.max(1, ...bandStats.map(b => b.clickHits));
+    const buckets = bandStats.map(b => {
+      const score = (b.scrollHits / maxScroll) * 0.6 + (b.clickHits / maxClicks) * 0.4; // weighted formula
+      return {
+        label: `${b.from}-${b.to}%`,
+        value: parseFloat(score.toFixed(3)),
+        scrollHits: b.scrollHits,
+        clickHits: b.clickHits,
+        firstSeen: b.firstSeen,
+        lastSeen: b.lastSeen,
+      };
+    });
+
+    // Below-the-fold detection: percent of interactions occurring after 50%
+    const belowFoldScroll = bandStats.filter(b => b.from >= 50).reduce((s, b) => s + b.scrollHits, 0);
+    const totalScroll = bandStats.reduce((s,b)=> s + b.scrollHits, 0);
+    const belowFoldClicks = bandStats.filter(b => b.from >= 50).reduce((s, b) => s + b.clickHits, 0);
+    const totalClicks = bandStats.reduce((s,b)=> s + b.clickHits, 0);
+    const belowTheFold = {
+      scrollPercent: totalScroll ? parseFloat(((belowFoldScroll / totalScroll) * 100).toFixed(2)) : 0,
+      clickPercent: totalClicks ? parseFloat(((belowFoldClicks / totalClicks) * 100).toFixed(2)) : 0,
+    };
+
+    res.json({ buckets, belowTheFold, totalScrollEvents: totalScroll, totalClickEvents: totalClicks });
+  } catch (error) {
+    console.error('Error computing attention map:', error);
+    res.status(500).json({ message: 'Failed to compute attention map', error: error.message });
+  }
+});
+
+// Detect rage clicks (rapid repeated clicks on the same element)
+// GET /api/tracking/interactions/rage-clicks?startDate&endDate&pageURL&threshold=3&windowMs=3000&limit=50
+router.get('/interactions/rage-clicks', async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      pageURL,
+      threshold = 3,
+      windowMs = 3000,
+      limit = 50,
+    } = req.query;
+
+    const match = { eventType: 'click' };
+    if (pageURL) match.pageURL = pageURL;
+    if (startDate || endDate) {
+      match.timestamp = {};
+      if (startDate) match.timestamp.$gte = new Date(startDate);
+      if (endDate) match.timestamp.$lte = new Date(endDate);
+    }
+
+    const clicks = await UserInteraction.find(match)
+      .select('sessionId pageURL timestamp metadata.element metadata.elementId metadata.className metadata.text metadata.x metadata.y')
+      .sort({ sessionId: 1, pageURL: 1, 'metadata.elementId': 1, timestamp: 1 })
+      .lean();
+
+  const t = parseInt(threshold, 10) || 3;
+  const w = parseInt(windowMs, 10) || 3000;
+  const maxItems = parseInt(limit, 10) || 50;
+
+    // Group by session + element signature
+    const groups = new Map();
+    const sigFor = (m) => {
+      return (
+        (m?.elementId && `#${m.elementId}`) ||
+        (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0,2).join('.')}`) ||
+        (m?.element && String(m.element).toLowerCase()) ||
+        'unknown'
+      );
+    };
+
+    for (const c of clicks) {
+      const sig = sigFor(c.metadata || {});
+      const key = `${c.sessionId}|${c.pageURL}|${sig}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(c);
+    }
+
+    // Detect rapid sequences within window
+    const incidents = [];
+    groups.forEach((arr, key) => {
+      let i = 0;
+      for (let j = 0; j < arr.length; j++) {
+        const tj = new Date(arr[j].timestamp).getTime();
+        while (i < j && tj - new Date(arr[i].timestamp).getTime() > w) i++;
+        const count = j - i + 1;
+        if (count >= t) {
+          const slice = arr.slice(i, j + 1);
+          const avgX = Math.round(
+            slice.reduce((s, it) => s + (it.metadata?.x ?? 0), 0) / slice.length
+          );
+          const avgY = Math.round(
+            slice.reduce((s, it) => s + (it.metadata?.y ?? 0), 0) / slice.length
+          );
+          const [sessionId, pageURL, selector] = key.split('|');
+          incidents.push({
+            sessionId,
+            pageURL,
+            selector,
+            count,
+            firstTimestamp: slice[0].timestamp,
+            lastTimestamp: slice[slice.length - 1].timestamp,
+            position: { x: avgX, y: avgY },
+            sampleText: slice.find(s => s.metadata?.text)?.metadata?.text?.slice(0, 60) || null,
+          });
+          // advance window to avoid duplicate overlapping detections
+          i = j + 1;
+        }
+      }
+    });
+
+    // Aggregate by pageURL + selector
+    const bySpot = new Map();
+    for (const inc of incidents) {
+      const k = `${inc.pageURL}|${inc.selector}`;
+      const cur = bySpot.get(k) || {
+        pageURL: inc.pageURL,
+        selector: inc.selector,
+        incidents: 0,
+        totalClicksInIncidents: 0,
+        sessions: new Set(),
+        firstSeen: inc.firstTimestamp,
+        lastSeen: inc.lastTimestamp,
+        samplePosition: inc.position,
+        sampleText: inc.sampleText,
+      };
+      cur.incidents += 1;
+      cur.totalClicksInIncidents += inc.count;
+      cur.sessions.add(inc.sessionId);
+      cur.firstSeen = new Date(Math.min(new Date(cur.firstSeen).getTime(), new Date(inc.firstTimestamp).getTime()));
+      cur.lastSeen = new Date(Math.max(new Date(cur.lastSeen).getTime(), new Date(inc.lastTimestamp).getTime()));
+      bySpot.set(k, cur);
+    }
+
+    const items = Array.from(bySpot.values())
+      .map(v => ({
+        ...v,
+        sessions: Array.from(v.sessions),
+      }))
+      .sort((a, b) => b.incidents - a.incidents || b.totalClicksInIncidents - a.totalClicksInIncidents)
+      .slice(0, maxItems);
+
+    res.json({ items, totalIncidents: incidents.length });
+  } catch (error) {
+    console.error('Error detecting rage clicks:', error);
+    res.status(500).json({ message: 'Failed to detect rage clicks', error: error.message });
+  }
+});
+
+// Detect dead clicks (clicks with no meaningful follow-up action within a short window)
+// GET /api/tracking/interactions/dead-clicks?startDate&endDate&pageURL&idleMs=2000&limit=50
+router.get('/interactions/dead-clicks', async (req, res) => {
+  try {
+  const { startDate, endDate, pageURL, idleMs = 2000, limit = 50 } = req.query;
+  const w = parseInt(idleMs, 10) || 2000;
+  const maxItems = parseInt(limit, 10) || 50;
+
+    const match = {};
+    if (startDate || endDate) {
+      match.timestamp = {};
+      if (startDate) match.timestamp.$gte = new Date(startDate);
+      if (endDate) match.timestamp.$lte = new Date(endDate);
+    }
+    if (pageURL) match.pageURL = pageURL;
+
+    const interactions = await UserInteraction.find(match)
+      .select('sessionId pageURL eventType timestamp metadata.element metadata.elementId metadata.className metadata.text')
+      .sort({ sessionId: 1, timestamp: 1 })
+      .lean();
+
+    // Group by session
+    const bySession = new Map();
+    for (const ev of interactions) {
+      const arr = bySession.get(ev.sessionId) || [];
+      arr.push(ev);
+      bySession.set(ev.sessionId, arr);
+    }
+
+    const results = [];
+    const selectorOf = (m) => (
+      (m?.elementId && `#${m.elementId}`) ||
+      (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0,2).join('.')}`) ||
+      (m?.element && String(m.element).toLowerCase()) ||
+      'unknown'
+    );
+
+    bySession.forEach((events) => {
+      for (let i = 0; i < events.length; i++) {
+        const ev = events[i];
+        if (ev.eventType !== 'click') continue;
+        const t0 = new Date(ev.timestamp).getTime();
+        let meaningful = false;
+        let j = i + 1;
+        for (; j < events.length; j++) {
+          const e = events[j];
+          const tj = new Date(e.timestamp).getTime();
+          if (tj - t0 > w) break;
+          // Any navigation or submit within window marks as meaningful
+          if (e.eventType === 'pageview' || e.eventType === 'submit') {
+            meaningful = true; break;
+          }
+          // If user clicked a different element within window, consider not-dead (user progressed)
+          if (e.eventType === 'click') {
+            const s0 = selectorOf(ev.metadata || {});
+            const s1 = selectorOf(e.metadata || {});
+            if (s0 !== s1) { meaningful = true; break; }
+          }
+          // Custom metadata action markers
+          if (e.metadata?.action && /navigate|open|success/i.test(String(e.metadata.action))) {
+            meaningful = true; break;
+          }
+        }
+        if (!meaningful) {
+          results.push({
+            sessionId: ev.sessionId,
+            pageURL: ev.pageURL,
+            selector: selectorOf(ev.metadata || {}),
+            timestamp: ev.timestamp,
+            sampleText: ev.metadata?.text?.slice(0, 60) || null,
+          });
+        }
+      }
+    });
+
+    // Aggregate by pageURL + selector
+    const bySpot = new Map();
+    for (const r of results) {
+      const k = `${r.pageURL}|${r.selector}`;
+      const cur = bySpot.get(k) || {
+        pageURL: r.pageURL,
+        selector: r.selector,
+        deadClicks: 0,
+        sessions: new Set(),
+        firstSeen: r.timestamp,
+        lastSeen: r.timestamp,
+        sampleText: r.sampleText,
+      };
+      cur.deadClicks += 1;
+      cur.sessions.add(r.sessionId);
+      cur.firstSeen = new Date(Math.min(new Date(cur.firstSeen).getTime(), new Date(r.timestamp).getTime()));
+      cur.lastSeen = new Date(Math.max(new Date(cur.lastSeen).getTime(), new Date(r.timestamp).getTime()));
+      bySpot.set(k, cur);
+    }
+
+    const items = Array.from(bySpot.values())
+      .map(v => ({ ...v, sessions: Array.from(v.sessions) }))
+      .sort((a, b) => b.deadClicks - a.deadClicks)
+      .slice(0, maxItems);
+
+    res.json({ items, totalDeadClicks: results.length });
+  } catch (error) {
+    console.error('Error detecting dead clicks:', error);
+    res.status(500).json({ message: 'Failed to detect dead clicks', error: error.message });
+  }
+});
+
 // ===== HEATMAP ENDPOINTS =====
 
 // Generate or retrieve heatmap data
@@ -551,6 +923,116 @@ router.get('/heatmap/raw', async (req, res) => {
 });
 
 // ===== DATA MANAGEMENT ENDPOINTS =====
+
+// Get recording status (for reconnect support)
+// NOTE: This supersedes the outdated snippet in NOTES_RECORDING_STATUS.txt (now removed).
+// We track an in-memory active recording (global.activeRecording) initiated via Socket.IO
+// admin-start-recording events, rather than persisting an arbitrary Recording model. This
+// endpoint is queried by LiveRecordingDashboard on mount to offer a resume option.
+router.get('/recording-status', async (req, res) => {
+  try {
+    // Check if there's an active recording in progress
+    // This is stored in memory via Socket.IO, so we query global state
+    const activeRecording = global.activeRecording || null;
+    
+    if (activeRecording) {
+      res.json({
+        isRecording: true,
+        recordingId: activeRecording.recordingId,
+        startTime: activeRecording.startTime,
+        projectId: activeRecording.projectId || 'default',
+      });
+    } else {
+      res.json({
+        isRecording: false,
+        recordingId: null,
+      });
+    }
+  } catch (error) {
+    console.error('[RecordingStatus] Error checking status:', error);
+    res.status(500).json({ 
+      message: 'Failed to check recording status', 
+      error: error.message 
+    });
+  }
+});
+
+// Save live recording from admin dashboard
+router.post('/save-recording', async (req, res) => {
+  try {
+    const { sessionId, projectId, events, metadata, startTime, endTime, duration } = req.body;
+
+    console.log(`[SaveRecording] Saving recording ${sessionId} with ${events?.length || 0} events`);
+
+    // Create session recording
+    const sessionRecording = new SessionRecording({
+      sessionId,
+      projectId: projectId || 'default',
+      userId: metadata?.userId || 'anonymous',
+      events: events || [],
+      metadata: {
+        ...metadata,
+        recordingType: 'admin-triggered',
+        url: metadata?.url || 'unknown',
+        title: metadata?.title || 'Live Recording',
+        device: {
+          deviceType: metadata?.deviceType || 'unknown',
+          browser: metadata?.browser || 'unknown',
+          os: metadata?.os || 'unknown',
+          screen: metadata?.screen || 'unknown',
+        },
+      },
+      startTime: startTime || new Date(),
+      endTime: endTime || new Date(),
+      duration: duration || 0,
+      createdAt: new Date(),
+    });
+
+    await sessionRecording.save();
+
+    console.log(`[SaveRecording] Recording ${sessionId} saved successfully`);
+
+    // Emit event for Phase 3 - notify analytics pages
+    if (global.io) {
+      global.io.emit('session-recorded', {
+        sessionId,
+        pageURL: metadata?.url,
+        duration,
+        timestamp: Date.now(),
+      });
+      console.log(`[SaveRecording] Emitted session-recorded event for ${sessionId}`);
+    }
+
+    // Trigger heatmap regeneration (Phase 3)
+    if (metadata?.url) {
+      try {
+        const { regenerateHeatmapsForPage } = require('../services/heatmapAggregation');
+        
+        // Trigger regeneration using the aggregation service
+        const results = await regenerateHeatmapsForPage(metadata.url);
+        
+        console.log(`[SaveRecording] Heatmap regeneration results:`, results);
+      } catch (heatmapErr) {
+        console.error('[SaveRecording] Error regenerating heatmaps:', heatmapErr);
+        // Don't fail the request if heatmap regeneration fails
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Recording saved successfully',
+      sessionId,
+      eventsCount: events?.length || 0,
+    });
+  } catch (error) {
+    console.error('[SaveRecording] Error saving recording:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save recording',
+      error: error.message,
+    });
+  }
+});
 
 // Get analytics stats
 router.get('/stats', async (req, res) => {

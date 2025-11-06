@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import api from '../../services/api';
+import { toast } from '@/components/ui/use-toast';
 import {
   Zap,
   Activity,
@@ -27,6 +29,8 @@ interface PerformanceMetric {
   };
 }
 
+const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+
 const PerformanceAnalytics: React.FC = () => {
   const [metrics, setMetrics] = useState<PerformanceMetric[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +39,27 @@ const PerformanceAnalytics: React.FC = () => {
 
   useEffect(() => {
     fetchPerformanceData();
+
+    // Setup WebSocket for real-time updates
+    const socket = io(API_URL, { withCredentials: true });
+
+    socket.on('connect', () => {
+      console.log('[PerformanceAnalytics] Connected to WebSocket');
+      socket.emit('join', 'default');
+    });
+
+    socket.on('session-recorded', ({ sessionId, pageURL, duration }: any) => {
+      console.log('[PerformanceAnalytics] New session recorded:', sessionId);
+      toast({
+        title: 'New Session Recorded',
+        description: `${Math.round((duration || 0) / 1000)}s session on ${pageURL || 'unknown page'}`,
+      });
+      fetchPerformanceData();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [dateRange, selectedPage]);
 
   const fetchPerformanceData = async () => {

@@ -2,14 +2,36 @@ const EventAnalytics = require('../models/EventAnalytics');
 const PerformanceMetrics = require('../models/PerformanceMetrics');
 const Session = require('../models/Session');
 const PageView = require('../models/PageView');
+const UserInteraction = require('../models/UserInteraction');
 
 // Get comprehensive dashboard overview
 exports.getDashboardOverview = async (req, res) => {
   try {
-    const { projectId, from, to } = req.query;
+    const { projectId, from, to, device, country, utmSource, referrerContains, pathPrefix } = req.query;
 
-    const matchQuery = {};
+  const matchQuery = {};
     if (projectId) matchQuery.projectId = projectId;
+
+  // Segment filters applied to Session-based aggregations
+  const sessionSegmentMatch = {};
+  if (device) sessionSegmentMatch['device.type'] = device; // session schema uses device.type
+  if (country) sessionSegmentMatch['location.country'] = country;
+  if (utmSource) sessionSegmentMatch['utmSource'] = utmSource;
+  if (referrerContains) sessionSegmentMatch['referrer'] = { $regex: referrerContains, $options: 'i' };
+
+  // Page-level segment filters
+  const pageViewSegmentMatch = {};
+  if (pathPrefix) pageViewSegmentMatch.pageURL = { $regex: `^${pathPrefix}` };
+  if (referrerContains) pageViewSegmentMatch.referrer = { $regex: referrerContains, $options: 'i' };
+  if (device) pageViewSegmentMatch['device'] = device; // PageView schema has device as string
+
+  // Interaction-level filters
+  const interactionSegmentMatch = {};
+  if (pathPrefix) interactionSegmentMatch.pageURL = { $regex: `^${pathPrefix}` };
+  if (device) interactionSegmentMatch['metadata.device'] = device;
+  if (country) interactionSegmentMatch['metadata.country'] = country; // if stored
+  if (utmSource) interactionSegmentMatch['metadata.utmSource'] = utmSource; // if stored
+  if (referrerContains) interactionSegmentMatch.referrer = { $regex: referrerContains, $options: 'i' };
 
     const dateQuery = {};
     if (from || to) {
@@ -32,12 +54,14 @@ exports.getDashboardOverview = async (req, res) => {
       // Total page views
       PageView.countDocuments({
         ...matchQuery,
+        ...pageViewSegmentMatch,
         ...(Object.keys(dateQuery).length && { timestamp: dateQuery }),
       }),
 
       // Unique visitors (distinct user IDs)
       Session.distinct('userId', {
         ...matchQuery,
+        ...sessionSegmentMatch,
         ...(Object.keys(dateQuery).length && { startTime: dateQuery }),
       }).then(users => users.length),
 
@@ -46,6 +70,7 @@ exports.getDashboardOverview = async (req, res) => {
         {
           $match: {
             ...matchQuery,
+            ...sessionSegmentMatch,
             ...(Object.keys(dateQuery).length && { startTime: dateQuery }),
           },
         },
@@ -65,6 +90,7 @@ exports.getDashboardOverview = async (req, res) => {
         {
           $match: {
             ...matchQuery,
+            ...pageViewSegmentMatch,
             ...(Object.keys(dateQuery).length && { timestamp: dateQuery }),
           },
         },
@@ -93,6 +119,7 @@ exports.getDashboardOverview = async (req, res) => {
         {
           $match: {
             ...matchQuery,
+            ...sessionSegmentMatch,
             ...(Object.keys(dateQuery).length && { startTime: dateQuery }),
             referrer: { $exists: true, $ne: null, $ne: '' },
           },
@@ -112,12 +139,13 @@ exports.getDashboardOverview = async (req, res) => {
         {
           $match: {
             ...matchQuery,
+            ...sessionSegmentMatch,
             ...(Object.keys(dateQuery).length && { startTime: dateQuery }),
           },
         },
         {
           $group: {
-            _id: '$device.deviceType',
+            _id: '$device.type',
             count: { $sum: 1 },
           },
         },
@@ -128,6 +156,7 @@ exports.getDashboardOverview = async (req, res) => {
         {
           $match: {
             ...matchQuery,
+            ...sessionSegmentMatch,
             ...(Object.keys(dateQuery).length && { startTime: dateQuery }),
           },
         },
@@ -153,6 +182,7 @@ exports.getDashboardOverview = async (req, res) => {
         {
           $match: {
             ...matchQuery,
+            ...pageViewSegmentMatch,
             timestamp: {
               $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
             },
@@ -169,6 +199,129 @@ exports.getDashboardOverview = async (req, res) => {
         { $sort: { _id: 1 } },
       ]),
     ]);
+
+    // Compute events per minute (last 60s) and short trend (last 15 min)
+    const now = Date.now();
+    const oneMinuteAgo = new Date(now - 60 * 1000);
+    const fifteenMinAgo = new Date(now - 15 * 60 * 1000);
+    const uiMatchBase = {
+      ...(projectId ? { projectId } : {}),
+      ...interactionSegmentMatch,
+    };
+
+    const [eventsPerMinute, eventsPerMinuteTrendRaw] = await Promise.all([
+      UserInteraction.countDocuments({
+        ...uiMatchBase,
+        timestamp: { $gte: oneMinuteAgo },
+      }),
+      UserInteraction.aggregate([
+        {
+          $match: {
+            ...uiMatchBase,
+            timestamp: { $gte: fifteenMinAgo },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%H:%M', date: '$timestamp' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    // Map to trend array with label/time and events
+    const eventsPerMinuteTrend = (eventsPerMinuteTrendRaw || []).map((t) => ({ time: t._id, events: t.count }));
+
+    // Compute Core Web Vitals P75 over last 30 minutes
+    const thirtyMinAgo = new Date(now - 30 * 60 * 1000);
+    const perfMatch = {
+      ...(projectId ? { projectId } : {}),
+      timestamp: { $gte: thirtyMinAgo },
+      ...(pathPrefix ? { pageURL: { $regex: `^${pathPrefix}` } } : {}),
+    };
+    const perfDocs = await PerformanceMetrics.find(perfMatch)
+      .select('LCP CLS INP')
+      .sort({ timestamp: -1 })
+      .limit(1000)
+      .lean();
+
+    function percentile(arr, p) {
+      if (!arr || arr.length === 0) return 0;
+      const a = arr.slice().filter((v) => v !== undefined && v !== null && !Number.isNaN(v)).sort((x, y) => x - y);
+      if (a.length === 0) return 0;
+      const idx = Math.ceil((p / 100) * a.length) - 1;
+      return a[Math.max(0, Math.min(a.length - 1, idx))];
+    }
+
+    const lcpVals = perfDocs.map((d) => d.LCP).filter((v) => typeof v === 'number');
+    const clsVals = perfDocs.map((d) => d.CLS).filter((v) => typeof v === 'number');
+    const inpVals = perfDocs.map((d) => d.INP).filter((v) => typeof v === 'number');
+
+    const lcpP75 = Math.round(percentile(lcpVals, 75));
+    const clsP75 = Math.round(percentile(clsVals, 75) * 1000) / 1000; // keep 3 decimals
+    const inpP75 = Math.round(percentile(inpVals, 75));
+
+    // Rage and error counts over last 10 minutes
+    const tenMinAgo = new Date(now - 10 * 60 * 1000);
+
+    // Error sessions: count perf documents with at least one jsError in window
+    const errorsLast10m = await PerformanceMetrics.countDocuments({
+      ...(projectId ? { projectId } : {}),
+      timestamp: { $gte: tenMinAgo },
+      jsErrors: { $exists: true, $ne: [] },
+      ...(pathPrefix ? { pageURL: { $regex: `^${pathPrefix}` } } : {}),
+    });
+
+    // Rage sessions: heuristic based on 3+ clicks on same element within 3s window per session
+    const clickDocs = await UserInteraction.find({
+      ...(projectId ? { projectId } : {}),
+      eventType: 'click',
+      timestamp: { $gte: tenMinAgo },
+      ...interactionSegmentMatch,
+    })
+      .select('sessionId pageURL metadata.element metadata.elementId metadata.text timestamp')
+      .sort({ sessionId: 1, 'metadata.elementId': 1, timestamp: 1 })
+      .lean();
+
+    let rageLast10m = 0;
+    const rageSessions = new Set();
+    const keyFor = (doc) => `${doc.sessionId}|${doc.pageURL}|${doc.metadata?.elementId || doc.metadata?.element || doc.metadata?.text || 'unknown'}`;
+    let i = 0;
+    while (i < clickDocs.length) {
+      const base = clickDocs[i];
+      const baseKey = keyFor(base);
+      let count = 1;
+      let j = i + 1;
+      while (j < clickDocs.length) {
+        const cur = clickDocs[j];
+        if (keyFor(cur) !== baseKey) break;
+        if (new Date(cur.timestamp) - new Date(base.timestamp) <= 3000) {
+          count++;
+          j++;
+          continue;
+        }
+        break;
+      }
+      if (count >= 3) {
+        rageSessions.add(base.sessionId);
+      }
+      i = j;
+    }
+    rageLast10m = rageSessions.size;
+
+    // Co-occurrence: sessions with both rage AND errors
+    const errorSessions = await PerformanceMetrics.find({
+      ...(projectId ? { projectId } : {}),
+      timestamp: { $gte: tenMinAgo },
+      jsErrors: { $exists: true, $ne: [] },
+    }).distinct('sessionId');
+    
+    const errorSessionSet = new Set(errorSessions);
+    const coOccurrence = [...rageSessions].filter(sid => errorSessionSet.has(sid)).length;
 
     const sessionData = sessionMetrics[0] || {
       totalSessions: 0,
@@ -190,6 +343,14 @@ exports.getDashboardOverview = async (req, res) => {
       totalPageViews,
       avgSessionDuration: Math.round(sessionData.avgDuration || 0),
       bounceRate: Math.round(bounceRate * 10) / 10,
+      eventsPerMinute,
+      eventsPerMinuteTrend,
+      lcpP75,
+      clsP75,
+      inpP75,
+      rageLast10m,
+      errorsLast10m,
+      rageErrorCoOccurrence: coOccurrence,
       topPages: topPages.map(p => ({
         page: p.pageURL, // Changed from 'url' to 'page' for frontend consistency
         views: p.views,
@@ -221,6 +382,14 @@ exports.getDashboardOverview = async (req, res) => {
         bounceRate: Math.round(bounceRate * 10) / 10,
         avgPageViews: Math.round((sessionData.avgPageViews || 0) * 10) / 10,
         realTimeVisitors,
+      },
+      // Echo applied segment filters for client awareness
+      segments: {
+        device: device || null,
+        country: country || null,
+        utmSource: utmSource || null,
+        referrerContains: referrerContains || null,
+        pathPrefix: pathPrefix || null,
       },
     });
   } catch (error) {

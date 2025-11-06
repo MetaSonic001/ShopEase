@@ -23,6 +23,7 @@ import {
   Video,
   Target,
 } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 import {
   BarChart,
   Bar,
@@ -99,10 +100,34 @@ const RealTimeAnalyticsDashboard2: React.FC = () => {
 
     socket.on("event", (event: any) => {
       console.log("Real-time event:", event)
+      const mapped = event?.data
+        ? { type: event.data.eventType || event.type || 'event', page: event.data.pageURL, timestamp: event.data.timestamp || Date.now() }
+        : { type: event.type || 'event', page: event.pageURL, timestamp: event.timestamp || Date.now() }
       setStats((prev) => ({
         ...prev,
-        realtimeEvents: [event, ...prev.realtimeEvents].slice(0, 10),
+        realtimeEvents: [mapped, ...prev.realtimeEvents].slice(0, 10),
       }))
+    })
+
+    socket.on("interaction", (payload: any) => {
+      const mapped = {
+        type: payload?.eventType || 'interaction',
+        page: payload?.pageURL || '-',
+        timestamp: payload?.timestamp || Date.now(),
+      }
+      setStats((prev) => ({
+        ...prev,
+        realtimeEvents: [mapped, ...prev.realtimeEvents].slice(0, 10),
+      }))
+    })
+
+    socket.on("session-recorded", ({ sessionId, pageURL, duration }: any) => {
+      console.log("[Dashboard2] New session recorded:", sessionId)
+      toast({
+        title: "New Session Recorded",
+        description: `${Math.round((duration || 0) / 1000)}s session on ${pageURL || "unknown page"}`,
+      })
+      fetchDashboardData()
     })
 
     return () => {
@@ -136,12 +161,10 @@ const RealTimeAnalyticsDashboard2: React.FC = () => {
 
       const sessions = sessionsRes.data.sessions || []
       const activeSessions = sessions.filter((s: any) => !s.isComplete)
-      const totalSessions = sessionsRes.data.pagination?.total || sessions.length
 
       const interactionsSummary = interactionsRes.data.summary || []
       const overallSummary = summaryRes.data.summary || []
 
-      const totalEvents = interactionsSummary.reduce((sum: number, item: any) => sum + item.count, 0)
       const pageviews = interactionsSummary.find((i: any) => i.eventType === "pageview")?.count || 0
       const avgDuration = overallSummary[0]?.avgTimeOnPage || 0
       const uniqueUsers = new Set(sessions.map((s: any) => s.userId)).size
@@ -460,7 +483,7 @@ const RealTimeAnalyticsDashboard2: React.FC = () => {
                     fill="#8884d8"
                     dataKey="count"
                   >
-                    {stats.deviceBreakdown.map((entry, index) => (
+                    {stats.deviceBreakdown.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

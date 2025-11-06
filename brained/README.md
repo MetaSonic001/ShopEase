@@ -203,3 +203,21 @@ Add your media under `public/demo/` (or a `docs/` folder) and update the links b
 ---
 
 Made with ❤️ for fast experiments and solid e‑commerce UX.
+
+## 📤 Exports: PDF & CSV
+
+Most analytics pages in the Admin area include an Export toolbar in the top‑right:
+
+- Export PDF: captures the visible dashboard section into a paginated PDF (via html2canvas + jsPDF). Use when you want a visual report of charts, tables, and KPIs as they appear on screen.
+- Export CSV: provides one or more dataset options (e.g., Top Pages, Device Breakdown). Each option downloads a well‑quoted CSV ready for spreadsheets or BI tools.
+
+Tips:
+
+- If a PDF looks clipped, scroll the dashboard to reveal the content you want and export again. The exporter snapshots the referenced container.
+- For very tall dashboards, the PDF is automatically split into multiple pages.
+- CSVs include headers and robust quoting for fields containing commas or quotes.
+
+Troubleshooting:
+
+- Ensure dependencies are installed in the frontend: html2canvas and jspdf.
+- If a page doesn’t show the toolbar, it may not have exportable content yet.

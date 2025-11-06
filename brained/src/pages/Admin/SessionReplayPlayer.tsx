@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import rrwebPlayer from 'rrweb-player';
+import 'rrweb-player/dist/style.css';
 import {
   Play,
   Pause,
@@ -12,7 +14,8 @@ import {
   Clock,
   MousePointer2,
   MonitorPlay,
-  ArrowLeft
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 
 interface RecordingEvent {

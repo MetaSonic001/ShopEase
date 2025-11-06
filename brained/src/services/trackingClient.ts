@@ -1,5 +1,6 @@
 import axios from 'axios';
 import SessionRecorder from './sessionRecorder';
+import { getProjectId } from './config';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -495,7 +496,7 @@ class TrackingClient {
       const metrics = {
         sessionId: this.sessionId,
         userId: this.userId || 'anonymous',
-        projectId: 'default',
+        projectId: getProjectId(),
         pageURL: window.location.href,
         TTFB: performanceMetrics.TTFB,
         FCP: performanceMetrics.FCP,
@@ -561,7 +562,7 @@ class TrackingClient {
     const payload = {
       sessionId: this.sessionId,
       userId: this.userId || 'anonymous',
-      projectId: 'default',
+      projectId: getProjectId(),
       eventType: eventData.eventType,
       eventName: eventData.eventName,
       pageURL: eventData.pageURL,
@@ -627,7 +628,7 @@ class TrackingClient {
     this.sessionRecorder = new SessionRecorder({
       sessionId: this.sessionId,
       userId: this.userId || 'anonymous',
-      projectId: 'default',
+      projectId: getProjectId(),
       onError: (error) => {
         console.error('[TrackingClient] Recording error:', error);
       },

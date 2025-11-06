@@ -85,25 +85,206 @@ const io = new Server(server, {
 app.set('io', io);
 global.io = io;
 
+// Initialize global state for active recordings
+global.activeRecording = null;
+
+// Helper: enrich event metadata with classification tags
+function enrichEventMetadata(event, metadata) {
+  const enriched = { ...(metadata || {}) };
+  
+  // Classify based on event type and data
+  if (event?.type === 3) { // IncrementalSnapshot
+    const source = event?.data?.source;
+    if (source === 0) enriched.classification = 'mutation';
+    else if (source === 1) enriched.classification = 'mousemove';
+    else if (source === 2) {
+      const interactionType = event?.data?.type;
+      if (interactionType === 0) enriched.classification = 'mouseup';
+      else if (interactionType === 1) enriched.classification = 'mousedown';
+      else if (interactionType === 2) enriched.classification = 'click';
+      else enriched.classification = 'interaction';
+    } else if (source === 3) enriched.classification = 'scroll';
+    else if (source === 4) enriched.classification = 'viewport-resize';
+    else if (source === 5) enriched.classification = 'input';
+    else if (source === 6) enriched.classification = 'media-interaction';
+  } else if (event?.type === 2) {
+    enriched.classification = 'full-snapshot';
+  } else if (event?.type === 4) {
+    enriched.classification = 'meta';
+  } else if (event?.type === 5) {
+    enriched.classification = 'custom';
+  }
+  
+  // Tag errors if present
+  if (metadata?.error || event?.data?.tag === 'error') {
+    enriched.hasError = true;
+  }
+  
+  return enriched;
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  console.log('[Socket.IO] Client connected:', socket.id);
 
   // Support both 'join' and 'join-project' events for flexibility
   socket.on('join', (projectId) => {
     const room = `project-${projectId}`;
     socket.join(room);
-    console.log(`Socket ${socket.id} joined project ${projectId} (room: ${room})`);
+    console.log(`[Socket.IO] ${socket.id} joined project ${projectId} (room: ${room})`);
   });
 
   socket.on('join-project', (projectId) => {
     const room = `project-${projectId}`;
     socket.join(room);
-    console.log(`Socket ${socket.id} joined project ${projectId} (room: ${room})`);
+    console.log(`[Socket.IO] ${socket.id} joined project ${projectId} (room: ${room})`);
+  });
+
+  // Admin joins admin room for live recording
+  socket.on('join-admin-room', ({ adminId }) => {
+    socket.join('admin-room');
+    console.log(`[Socket.IO] Admin ${adminId} joined admin room`);
+    
+    // Send active users count
+    const userSockets = io.sockets.adapter.rooms.get('project-default');
+    const activeUsers = userSockets ? userSockets.size : 0;
+    socket.emit('active-users', activeUsers);
+  });
+
+  // Admin starts recording - broadcast to all user clients
+  socket.on('admin-start-recording', ({ recordingId, projectId, adminId, timestamp }) => {
+    console.log(`[Socket.IO] Admin ${adminId} started recording ${recordingId} for project ${projectId}`);
+    
+    // Store active recording state globally
+    global.activeRecording = {
+      recordingId,
+      projectId: projectId || 'default',
+      adminId,
+      startTime: timestamp || Date.now(),
+    };
+    
+    // Broadcast to all users in the project (include multiple event name variants for SDKs)
+    const payload = {
+      recordingId,
+      startedBy: adminId,
+      timestamp,
+    };
+    io.to(`project-${projectId}`).emit('recording-start', payload);
+    io.to(`project-${projectId}`).emit('start-recording', payload);
+    io.to(`project-${projectId}`).emit('recording:start', payload);
+    io.to(`project-${projectId}`).emit('admin:recording:start', payload);
+    
+    // Join recording-specific room for this admin
+    socket.join(`recording-admin-${recordingId}`);
+    
+    console.log(`[Socket.IO] Recording ${recordingId} started, waiting for user events...`);
+  });
+
+  // Admin stops recording
+  socket.on('admin-stop-recording', ({ recordingId, timestamp }) => {
+    console.log(`[Socket.IO] Stopping recording ${recordingId}`);
+    
+    // Clear active recording state
+    if (global.activeRecording && global.activeRecording.recordingId === recordingId) {
+      global.activeRecording = null;
+    }
+    
+    // Broadcast to all users to stop recording (variants)
+    const payload = { recordingId, timestamp };
+    io.emit('recording-stop', payload);
+    io.emit('stop-recording', payload);
+    io.emit('recording:stop', payload);
+    io.emit('admin:recording:stop', payload);
+    
+    // Leave recording room
+    socket.leave(`recording-admin-${recordingId}`);
+  });
+
+  // User sends recording event to admin
+  socket.on('recording-event', ({ recordingId, event, metadata }) => {
+    console.log(`[Socket.IO] Received recording event for ${recordingId}, type: ${event?.type || 'unknown'}`);
+    
+    // Enrich event with classification tags
+    const enrichedMetadata = enrichEventMetadata(event, metadata);
+    
+    // Forward to admin dashboard watching this recording
+    io.to(`recording-admin-${recordingId}`).emit('live-event', {
+      recordingId,
+      event,
+      metadata: enrichedMetadata,
+      timestamp: Date.now(),
+    });
+  });
+
+  // Alias for SDKs using colon event name
+  socket.on('recording:event', (payload) => {
+    try {
+      const { projectId, sessionId, event, pageURL, timestamp } = payload || {};
+      // If there's an active recording for this project, forward to its admin room
+      if (global.activeRecording && (!projectId || global.activeRecording.projectId === projectId)) {
+        const rid = global.activeRecording.recordingId;
+        io.to(`recording-admin-${rid}`).emit('live-event', {
+          recordingId: rid,
+          event,
+          metadata: { sessionId, pageURL },
+          timestamp: timestamp || Date.now(),
+        });
+      }
+    } catch (e) {
+      console.error('[Socket.IO] Failed to handle recording:event alias', e);
+    }
+  });
+
+  // SDK registration (joins project room)
+  socket.on('sdk:register', ({ projectId, sessionId, userId, pageURL }) => {
+    try {
+      const pid = projectId || 'default';
+      socket.join(`project-${pid}`);
+      console.log(`[Socket.IO] SDK registered session ${sessionId} (${userId}) for project ${pid} @ ${pageURL}`);
+    } catch (e) {
+      console.error('[Socket.IO] sdk:register error', e);
+    }
+  });
+
+  // Admin-triggered heatmap overlay
+  socket.on('admin-show-heatmap', ({ projectId = 'default', options }) => {
+    const room = `project-${projectId}`;
+    io.to(room).emit('heatmap-show', options || {});
+    io.to(room).emit('admin:heatmap:show', options || {});
+  });
+  socket.on('admin-hide-heatmap', ({ projectId = 'default' }) => {
+    const room = `project-${projectId}`;
+    io.to(room).emit('heatmap-hide');
+    io.to(room).emit('admin:heatmap:hide');
+  });
+
+  // User joins and shares metadata
+  socket.on('user-joined', ({ userId, metadata, projectId }) => {
+    console.log(`[Socket.IO] User ${userId} joined project ${projectId}`);
+    
+    // Join project room
+    socket.join(`project-${projectId}`);
+    
+    // Notify admin room
+    io.to('admin-room').emit('user-joined', {
+      userId,
+      metadata,
+      timestamp: Date.now(),
+    });
+    
+    // Update active users count for admins
+    const userSockets = io.sockets.adapter.rooms.get(`project-${projectId}`);
+    const activeUsers = userSockets ? userSockets.size : 0;
+    io.to('admin-room').emit('active-users', activeUsers);
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log('[Socket.IO] Client disconnected:', socket.id);
+    
+    // Update active users count
+    const userSockets = io.sockets.adapter.rooms.get('project-default');
+    const activeUsers = userSockets ? userSockets.size : 0;
+    io.to('admin-room').emit('active-users', activeUsers);
   });
 });
 
@@ -121,6 +302,8 @@ const experimentsRoutes = require('./routes/experiments');
 const ordersRoutes = require('./routes/orders');
 const cartRoutes = require('./routes/cart');
 const analyticsAdminRoutes = require('./routes/analyticsAdmin');
+const alertsRoutes = require('./routes/alerts');
+const consentRoutes = require('./routes/consent');
 const rateLimiter = require('./middleware/rateLimiter');
 const deviceInfo = require('./middleware/deviceInfo');
 
@@ -138,6 +321,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/analytics', deviceInfo, analyticsRoutes);
 app.use('/api/analytics/flags', featureFlagsRoutes);
 app.use('/api/analytics/admin', analyticsAdminRoutes);
+app.use('/api/alerts', alertsRoutes);
+app.use('/api/consent', consentRoutes);
 
 // tracking routes for session recording, heatmaps, and interactions
 app.use('/api/tracking', deviceInfo, trackingRoutes);
@@ -156,6 +341,18 @@ app.use('/api/funnels', funnelsRoutes);
 
 // cohorts API
 app.use('/api/cohorts', cohortsRoutes);
+
+// paths API (Sankey)
+const pathsRoutes = require('./routes/paths');
+app.use('/api/paths', pathsRoutes);
+
+// insights API
+const insightsRoutes = require('./routes/insights');
+app.use('/api/insights', insightsRoutes);
+
+// trends API
+const trendsRoutes = require('./routes/trends');
+app.use('/api/trends', trendsRoutes);
 
 // experiments API (A/B testing)
 app.use('/api/experiments', experimentsRoutes);
@@ -205,6 +402,12 @@ mongoose
       console.log(`Server running on port ${PORT}`);
       console.log('🔄 Server ready - trackingRoutes.js loaded with PACKED EVENT SUPPORT');
       console.log('📝 Restart timestamp:', new Date().toISOString());
+      try {
+        const alertsScheduler = require('./services/alertsScheduler');
+        alertsScheduler.start();
+      } catch (e) {
+        console.error('Failed to start AlertsScheduler', e);
+      }
     });
   })
   .catch((err) => {

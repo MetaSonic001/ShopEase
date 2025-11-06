@@ -9,7 +9,6 @@ import {
   GitBranch,
   Users,
   FlaskConical,
-  BarChart3,
   Package,
   Settings,
   Circle,
@@ -18,8 +17,11 @@ import {
   Store,
   User,
   Activity,
-  UserCircle,
   Database,
+  Shield,
+  Bell,
+  Lightbulb,
+  BarChart2,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -117,18 +119,18 @@ const AdminLayout: React.FC = () => {
       icon: TrendingUp,
     },
     {
-      title: 'Activity Feed',
-      url: '/admin/analytics/activity',
+      title: 'Real-Time Dashboard',
+      url: '/admin/analytics/realtime',
       icon: Activity,
-    },
-    {
-      title: 'People',
-      url: '/admin/analytics/people',
-      icon: UserCircle,
     },
     {
       title: 'Session Recordings',
       url: '/admin/analytics/recordings',
+      icon: Video,
+    },
+    {
+      title: 'Live Recording',
+      url: '/admin/analytics/live-recording',
       icon: Video,
     },
     {
@@ -147,9 +149,24 @@ const AdminLayout: React.FC = () => {
       icon: GitBranch,
     },
     {
+      title: 'Path Analysis',
+      url: '/admin/analytics/paths',
+      icon: GitBranch,
+    },
+    {
       title: 'Cohort Analysis',
       url: '/admin/analytics/cohorts',
       icon: Users,
+    },
+    {
+      title: 'Trends',
+      url: '/admin/analytics/trends',
+      icon: BarChart2,
+    },
+    {
+      title: 'Auto-Insights',
+      url: '/admin/analytics/insights',
+      icon: Lightbulb,
     },
     {
       title: 'A/B Testing',
@@ -160,11 +177,6 @@ const AdminLayout: React.FC = () => {
       title: 'Feature Flags',
       url: '/admin/analytics/flags',
       icon: Settings,
-    },
-    {
-      title: 'Events & Metrics',
-      url: '/admin/analytics',
-      icon: BarChart3,
     },
   ];
 
@@ -183,6 +195,16 @@ const AdminLayout: React.FC = () => {
       title: 'Tracking Setup',
       url: '/admin/tracking',
       icon: Settings,
+    },
+    {
+      title: 'Alert Rules',
+      url: '/admin/monitoring/alerts',
+      icon: Bell,
+    },
+    {
+      title: 'Consent & Masking',
+      url: '/admin/privacy/consent',
+      icon: Shield,
     },
   ];
 

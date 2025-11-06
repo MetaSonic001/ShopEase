@@ -36,6 +36,26 @@ Instead of paying for multiple SaaS tools and sending your data to third parties
 
 ---
 
+| Feature | Location / Page | Summary |
+|---------|-----------------|---------|
+| Real‑Time Dashboard Enhancements | `RealTimeAnalyticsDashboard` | PDF/CSV export, grouped breakdowns (pages, devices, browsers) |
+| Heatmap Export | `HeatmapVisualization` | Added PDF + multi‑dataset CSV (raw points + summary) alongside existing PNG capture |
+| Path Analysis | `PathAnalysis` | Builds interaction graph (nodes = pages/events, weighted edges) with exportable CSV and PDF |
+| Trends Dashboard | `TrendsDashboard` | Rolling time‑series view (errors, performance vitals, rage clicks) with segmented CSV exports |
+| Insights Dashboard | `InsightsDashboard` | Consolidated anomalies: rage selectors, slow pages, high error surfaces |
+| Alert Rules Manager | `AlertRulesManager` | Create/edit metric threshold alerts (events/min, LCP, CLS, INP, JS errors); Slack + generic webhook channels; cooldowns; activation toggles; last triggered status |
+| Consent & Masking Manager | `ConsentMaskingManager` | Per‑selector masking + consent state management for privacy / compliance |
+| Rage Click Detection | Backend enrichment | Heuristic detection (rapid repeated clicks in region) surfaced in insights & trends |
+| Error Co‑Occurrence Analysis | Backend enrichment | Correlates front‑end errors with rage and performance events |
+| Event Enrichment | Ingestion pipeline | Adds device, browser, geo (if enabled), performance vitals snapshot, rage flags |
+| Export Toolbar | Shared component | Unified PDF + multi‑group CSV exporting built on `html2canvas` + `jsPDF` + custom CSV serializer |
+| PDF/CSV Utilities | `exportUtils.ts` | Normalized pagination screenshot → PDF, robust CSV quoting (handles delimiters/newlines/quotes) |
+| Webhook Retry & Cooldowns | Alert engine | Ensures failed webhooks are retried with exponential backoff; prevents alert spam |
+
+---
+
+---
+
 ## 📊 Platform Architecture
 
 ```
@@ -212,6 +232,49 @@ Instead of paying for multiple SaaS tools and sending your data to third parties
 │  ✓ Network request logging                              │
 │  ✓ Device and browser breakdown                         │
 └─────────────────────────────────────────────────────────┘
+
+### 🛎️ Alerting & Automation
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🚨 Metric-Based Alert Rules                            │
+├─────────────────────────────────────────────────────────┤
+│  ✓ Metrics: events/min, JS errors/min, LCP P75, CLS P75 │
+│  ✓ Comparators: >, >=, <, <=, ==, !=                   │
+│  ✓ Slack & generic webhook delivery                    │
+│  ✓ Cooldowns & last-trigger tracking                   │
+│  ✓ Retry logic with backoff                            │
+│  ✓ CSV/PDF export of current rules                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 🤝 Consent & Data Masking
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🛡️  Privacy Controls                                    │
+├─────────────────────────────────────────────────────────┤
+│  ✓ Per-selector masking (e.g. password, email fields)   │
+│  ✓ PII-safe session replay frames                       │
+│  ✓ Toggle-based runtime consent                         │
+│  ✓ Extensible masking strategy API                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 💥 Rage & Error Intelligence
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  😤 Rage & Error Correlation                            │
+├─────────────────────────────────────────────────────────┤
+│  ✓ Rage click heuristics (burst + spatial proximity)    │
+│  ✓ Error co-occurrence scoring                          │
+│  ✓ Surfaced in Insights & Trends dashboards             │
+│  ✓ Exportable anomaly tables                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
 ```
 
 ---
@@ -323,6 +386,8 @@ npm install
 # Configure frontend API base URL in src/services/api.ts:
 # - API_BASE: http://localhost:5000
 
+#   html2canvas, jspdf, heatmap.js, rrweb
+
 # Start frontend
 npm run dev
 ```
@@ -368,6 +433,11 @@ PagePulse/
 │   │   │   │   ├── Analytics.tsx     # Main Analytics Dashboard
 │   │   │   │   ├── RealTimeAnalyticsDashboard.tsx
 │   │   │   │   ├── HeatmapVisualization.tsx
+│   │   │   │   ├── PathAnalysis.tsx
+│   │   │   │   ├── TrendsDashboard.tsx
+│   │   │   │   ├── InsightsDashboard.tsx
+│   │   │   │   ├── AlertRulesManager.tsx
+│   │   │   │   ├── ConsentMaskingManager.tsx
 │   │   │   │   ├── SessionReplayPlayer.tsx
 │   │   │   │   ├── FunnelAnalysis.tsx
 │   │   │   │   ├── ABTesting.tsx
@@ -629,6 +699,61 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## 📤 Exports: PDF & CSV (Unified Toolbar)
+
+All analytics / admin dashboards now share a consistent Export toolbar:
+
+- **Export PDF** – Full dashboard section rendered via `html2canvas` then paginated with `jsPDF` (multi‑page for tall content)
+- **Export CSV** – One dropdown → multiple logical dataset groups (e.g. Top Pages, Device Breakdown, Rage Selectors, Alert Rules)
+
+Implementation notes:
+
+| Concern | Approach |
+|---------|----------|
+| Visual Fidelity | Uses pixel‑scaled canvas; removes transient animations for clarity |
+| Pagination | Dynamic page slicing based on cumulative canvas height |
+| CSV Safety | Values are quoted only when needed; internal quotes doubled |
+| Time Fields | Normalized to ISO 8601 where applicable (e.g. `lastTriggeredAt`) |
+| Extensibility | Pages provide `csvGroups[]` describing headers, rows, filename |
+
+Usage (page-level snippet):
+
+```tsx
+const containerRef = useRef<HTMLDivElement>(null);
+const csvGroups = [{ label: 'Alert Rules', headers: [...], rows: [...], filename: 'alert-rules.csv' }];
+<ExportToolbar targetRef={containerRef} pdfFilename="alert-rules.pdf" csvGroups={csvGroups} />
+```
+
+Troubleshooting:
+
+- Missing PDF button? Ensure the `targetRef` is attached to a rendered element.
+- Blank PDF: Content may be hidden behind virtualized scroll; expand/scroll then retry.
+- Large dashboards: Expect multi‑page output (automatic page breaks).
+
+---
+
+## 🔔 Alert Rules (Config Quick Reference)
+
+| Field | Description |
+|-------|-------------|
+| metric | `events_per_minute`, `js_errors_per_minute`, `lcp_p75`, `cls_p75`, `inp_p75` |
+| comparator | One of `>`, `>=`, `<`, `<=`, `==`, `!=` |
+| threshold | Numeric value (floats allowed) |
+| windowMinutes | Rolling window size for evaluation |
+| channel | `slack` or `webhook` |
+| cooldownMs | Minimum ms between successive firings |
+| isActive | Enable/disable rule without deletion |
+
+Webhook Delivery:
+
+- Slack: Incoming webhook URL (validated for presence)
+- Generic: Arbitrary POST target (JSON payload with rule + snapshot metrics)
+- Retries: Exponential backoff (initial small delay → capped)
+
+---
 
 ---
 

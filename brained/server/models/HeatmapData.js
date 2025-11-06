@@ -49,7 +49,10 @@ const heatmapDataSchema = new mongoose.Schema(
       totalInteractions: { type: Number, default: 0 },
       uniqueUsers: { type: Number, default: 0 },
       avgTimeOnPage: Number,
+      sessionCount: { type: Number, default: 0 },
+      lastUpdated: Date,
     },
+    sessionIds: [String],
   },
   {
     timestamps: true,
@@ -59,6 +62,7 @@ const heatmapDataSchema = new mongoose.Schema(
 // Compound indexes for efficient querying
 heatmapDataSchema.index({ pageURL: 1, type: 1, device: 1 });
 heatmapDataSchema.index({ projectId: 1, pageURL: 1, type: 1 });
+heatmapDataSchema.index({ 'metadata.lastUpdated': -1 });
 heatmapDataSchema.index({ createdAt: -1 });
 
 // Static method to aggregate raw interaction data into heatmap

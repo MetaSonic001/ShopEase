@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
+import { toast } from '@/components/ui/use-toast';
 import { 
   Users, 
   Eye, 
@@ -11,7 +12,7 @@ import {
   Clock,
   Globe,
   Smartphone,
-  Monitor,
+  
   Chrome,
   ArrowUp,
   ArrowDown,
@@ -21,7 +22,8 @@ import {
   Video,
   Target
 } from 'lucide-react';
-import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import ExportToolbar from '../../components/ExportToolbar';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 const SOCKET_URL = API_URL;
@@ -36,11 +38,19 @@ interface DashboardStats {
   deviceBreakdown: Array<{ device: string; count: number }>;
   browserBreakdown: Array<{ browser: string; count: number }>;
   eventTrends: Array<{ time: string; events: number }>;
-  realtimeEvents: Array<{ type: string; page: string; timestamp: Date }>;
+  realtimeEvents: Array<{ type: string; page: string; timestamp: Date | number }>;
+  eventsPerMinute?: number;
+  eventsPerMinuteTrend?: Array<{ time: string; events: number }>;
+  lcpP75?: number;
+  clsP75?: number;
+  inpP75?: number;
+  rageLast10m?: number;
+  errorsLast10m?: number;
 }
 
 const RealTimeAnalyticsDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const socketRef = useRef<any>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalVisitors: 0,
     activeVisitors: 0,
@@ -52,11 +62,30 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
     browserBreakdown: [],
     eventTrends: [],
     realtimeEvents: [],
+    eventsPerMinute: 0,
+    eventsPerMinuteTrend: [],
+    lcpP75: 0,
+    clsP75: 0,
+    inpP75: 0,
+    rageLast10m: 0,
+    errorsLast10m: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [userName, setUserName] = useState('Admin');
   const [greeting, setGreeting] = useState('');
   const [timeFilter, setTimeFilter] = useState('24h');
+  const [filters, setFilters] = useState({
+    device: '',
+    country: '',
+    utmSource: '',
+    referrerContains: '',
+    pathPrefix: '',
+  });
+  const [heatmapCtrl, setHeatmapCtrl] = useState({
+    radius: 28,
+    intensity: 0.35, // maps to maxAlpha
+    mode: 'click' as 'click' | 'scroll' | 'hover' | 'mousemove',
+  });
 
   useEffect(() => {
     // Set greeting based on time
@@ -77,7 +106,8 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
     fetchDashboardData();
     
     // Setup Socket.IO for real-time updates
-    const socket = io(SOCKET_URL, { withCredentials: true });
+  const socket = io(SOCKET_URL, { withCredentials: true });
+  socketRef.current = socket;
     
     socket.on('connect', () => {
       console.log('Connected to real-time analytics');
@@ -86,10 +116,35 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
 
     socket.on('event', (event: any) => {
       console.log('Real-time event:', event);
+      const mapped = event?.data
+        ? { type: event.data.eventType || event.type || 'event', page: event.data.pageURL, timestamp: event.data.timestamp || Date.now() }
+        : { type: event.type || 'event', page: event.pageURL, timestamp: event.timestamp || Date.now() };
       setStats(prev => ({
         ...prev,
-        realtimeEvents: [event, ...prev.realtimeEvents].slice(0, 10),
+        realtimeEvents: [mapped, ...prev.realtimeEvents].slice(0, 10),
       }));
+    });
+
+    // Also listen to interaction events from tracking routes
+    socket.on('interaction', (payload: any) => {
+      const mapped = {
+        type: payload?.eventType || 'interaction',
+        page: payload?.pageURL || '-',
+        timestamp: payload?.timestamp || Date.now(),
+      };
+      setStats(prev => ({
+        ...prev,
+        realtimeEvents: [mapped, ...prev.realtimeEvents].slice(0, 10),
+      }));
+    });
+
+    socket.on('session-recorded', ({ sessionId, pageURL, duration }: any) => {
+      console.log('[Dashboard] New session recorded:', sessionId);
+      toast({
+        title: 'New Session Recorded',
+        description: `${Math.round((duration || 0) / 1000)}s session on ${pageURL || 'unknown page'}`,
+      });
+      fetchDashboardData();
     });
 
     return () => {
@@ -101,8 +156,8 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch from new tracking APIs
-      const [sessionsRes, interactionsRes, summaryRes] = await Promise.all([
+      // Fetch from tracking APIs and enhanced overview in parallel
+      const [sessionsRes, interactionsRes, summaryRes, overviewRes] = await Promise.all([
         axios.get(`${API_URL}/api/tracking/sessions`, {
           params: { page: 1, limit: 100, isComplete: false },
           withCredentials: true,
@@ -120,19 +175,27 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
           },
           withCredentials: true,
         }),
+        axios.get(`${API_URL}/api/dashboard/overview`, {
+          withCredentials: true,
+          params: {
+            device: filters.device || undefined,
+            country: filters.country || undefined,
+            utmSource: filters.utmSource || undefined,
+            referrerContains: filters.referrerContains || undefined,
+            pathPrefix: filters.pathPrefix || undefined,
+          },
+        }),
       ]);
 
       // Process sessions data
       const sessions = sessionsRes.data.sessions || [];
       const activeSessions = sessions.filter((s: any) => !s.isComplete);
-      const totalSessions = sessionsRes.data.pagination?.total || sessions.length;
 
       // Process interactions summary
       const interactionsSummary = interactionsRes.data.summary || [];
       const overallSummary = summaryRes.data.summary || [];
       
       // Calculate metrics
-      const totalEvents = interactionsSummary.reduce((sum: number, item: any) => sum + item.count, 0);
       const pageviews = interactionsSummary.find((i: any) => i.eventType === 'pageview')?.count || 0;
       const avgDuration = overallSummary[0]?.avgTimeOnPage || 0;
       const uniqueUsers = new Set(sessions.map((s: any) => s.userId)).size;
@@ -189,15 +252,33 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
         browserBreakdown,
         eventTrends,
         realtimeEvents: stats.realtimeEvents, // Keep existing real-time events
+        // Merge enhanced overview metrics
+        eventsPerMinute: overviewRes?.data?.eventsPerMinute ?? 0,
+        eventsPerMinuteTrend: overviewRes?.data?.eventsPerMinuteTrend ?? [],
+        lcpP75: overviewRes?.data?.lcpP75 ?? 0,
+        clsP75: overviewRes?.data?.clsP75 ?? 0,
+        inpP75: overviewRes?.data?.inpP75 ?? 0,
+        rageLast10m: overviewRes?.data?.rageLast10m ?? 0,
+        errorsLast10m: overviewRes?.data?.errorsLast10m ?? 0,
       });
     } catch (err) {
       console.error('Failed to fetch dashboard data', err);
-      // Try fallback to old API
+      // Try fallback to old API which now includes enhanced metrics
       try {
         const response = await axios.get(`${API_URL}/api/dashboard/overview`, {
           withCredentials: true,
         });
-        setStats(response.data);
+        setStats(prev => ({
+          ...prev,
+          ...response.data,
+          eventsPerMinute: response.data.eventsPerMinute ?? prev.eventsPerMinute,
+          eventsPerMinuteTrend: response.data.eventsPerMinuteTrend ?? prev.eventsPerMinuteTrend,
+          lcpP75: response.data.lcpP75 ?? prev.lcpP75,
+          clsP75: response.data.clsP75 ?? prev.clsP75,
+          inpP75: response.data.inpP75 ?? prev.inpP75,
+          rageLast10m: response.data.rageLast10m ?? prev.rageLast10m,
+          errorsLast10m: response.data.errorsLast10m ?? prev.errorsLast10m,
+        }));
       } catch (fallbackErr) {
         console.error('Fallback API also failed', fallbackErr);
       }
@@ -220,8 +301,30 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const csvGroups = [
+    {
+      label: 'Top Pages',
+      headers: ['Page','Views'],
+      rows: stats.topPages.map(p => [p.page, p.views]),
+      filename: 'realtime-top-pages.csv'
+    },
+    {
+      label: 'Device Breakdown',
+      headers: ['Device','Count'],
+      rows: stats.deviceBreakdown.map(d => [d.device, d.count]),
+      filename: 'realtime-device-breakdown.csv'
+    },
+    {
+      label: 'Browser Breakdown',
+      headers: ['Browser','Count'],
+      rows: stats.browserBreakdown.map(b => [b.browser, b.count]),
+      filename: 'realtime-browser-breakdown.csv'
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div ref={containerRef} className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header Section */}
       <div className="px-6 py-8 border-b border-slate-200/50 bg-white sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -241,6 +344,7 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
             </select>
+            <ExportToolbar targetRef={containerRef as any} pdfFilename="realtime-dashboard.pdf" csvGroups={csvGroups} size="sm" />
             <button
               onClick={() => navigate('/admin/analytics/recordings')}
               className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-slate-700 font-medium"
@@ -257,12 +361,55 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
             </button>
           </div>
         </div>
+        {/* Filter Bar */}
+        <div className="max-w-7xl mx-auto mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+          <select
+            value={filters.device}
+            onChange={(e) => setFilters((f) => ({ ...f, device: e.target.value }))}
+            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700"
+          >
+            <option value="">All devices</option>
+            <option value="desktop">Desktop</option>
+            <option value="mobile">Mobile</option>
+            <option value="tablet">Tablet</option>
+          </select>
+          <input
+            placeholder="Country (e.g. US)"
+            value={filters.country}
+            onChange={(e) => setFilters((f) => ({ ...f, country: e.target.value }))}
+            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700"
+          />
+          <input
+            placeholder="UTM source"
+            value={filters.utmSource}
+            onChange={(e) => setFilters((f) => ({ ...f, utmSource: e.target.value }))}
+            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700"
+          />
+          <input
+            placeholder="Referrer contains"
+            value={filters.referrerContains}
+            onChange={(e) => setFilters((f) => ({ ...f, referrerContains: e.target.value }))}
+            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700"
+          />
+          <input
+            placeholder="Path prefix (e.g. /docs)"
+            value={filters.pathPrefix}
+            onChange={(e) => setFilters((f) => ({ ...f, pathPrefix: e.target.value }))}
+            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700"
+          />
+          <button
+            onClick={fetchDashboardData}
+            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium"
+          >
+            Apply
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
       <div className="px-6 py-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
             {/* Active Visitors Card */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
@@ -334,9 +481,41 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
                 <p className="text-sm text-slate-600">Avg Session Duration</p>
               </div>
             </div>
+            {/* Events Per Minute Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                    /min
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(stats.eventsPerMinute || 0)}</p>
+                <p className="text-sm text-slate-600">Events / Minute</p>
+              </div>
+            </div>
+
+            {/* Rage & Errors Badge Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-red-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
+              <div className="relative z-10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-600">Rage (10m)</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${ (stats.rageLast10m||0) > 5 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{stats.rageLast10m}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-600">Errors (10m)</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${ (stats.errorsLast10m||0) > 10 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{stats.errorsLast10m}</span>
+                </div>
+                <div className="mt-2 text-xs text-slate-400">Auto-refresh via socket events</div>
+              </div>
+            </div>
           </div>
 
-          {/* Charts Grid */}
+          {/* Charts & Vitals Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-6">
@@ -349,7 +528,7 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={stats.eventTrends} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={(stats.eventsPerMinuteTrend && stats.eventsPerMinuteTrend.length > 0) ? stats.eventsPerMinuteTrend : stats.eventTrends} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -413,6 +592,85 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* Core Web Vitals Gauges */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* LCP Gauge */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">LCP (P75)</h3>
+              <div className="flex items-center justify-center relative">
+                <svg className="w-28 h-28">
+                  <circle className="text-slate-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="56" cx="60" cy="60" />
+                  <circle
+                    className="text-blue-500"
+                    strokeWidth="8"
+                    strokeDasharray={2 * Math.PI * 56}
+                    strokeDashoffset={2 * Math.PI * 56 * (1 - Math.min((stats.lcpP75 || 0) / 4000, 1))}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="56"
+                    cx="60"
+                    cy="60"
+                    transform="rotate(-90 60 60)"
+                    style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                  />
+                </svg>
+                <span className="absolute text-lg font-bold text-slate-900">{(stats.lcpP75 || 0)}ms</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Target &lt; 2500ms</p>
+            </div>
+            {/* CLS Gauge */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">CLS (P75)</h3>
+              <div className="flex items-center justify-center relative">
+                <svg className="w-28 h-28">
+                  <circle className="text-slate-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="56" cx="60" cy="60" />
+                  <circle
+                    className="text-purple-500"
+                    strokeWidth="8"
+                    strokeDasharray={2 * Math.PI * 56}
+                    strokeDashoffset={2 * Math.PI * 56 * (1 - Math.min((stats.clsP75 || 0) / 0.3, 1))}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="56"
+                    cx="60"
+                    cy="60"
+                    transform="rotate(-90 60 60)"
+                    style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                  />
+                </svg>
+                <span className="absolute text-lg font-bold text-slate-900">{(stats.clsP75 || 0).toFixed(3)}</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Target &lt; 0.1</p>
+            </div>
+            {/* INP Gauge */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">INP (P75)</h3>
+              <div className="flex items-center justify-center relative">
+                <svg className="w-28 h-28">
+                  <circle className="text-slate-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="56" cx="60" cy="60" />
+                  <circle
+                    className="text-green-500"
+                    strokeWidth="8"
+                    strokeDasharray={2 * Math.PI * 56}
+                    strokeDashoffset={2 * Math.PI * 56 * (1 - Math.min((stats.inpP75 || 0) / 200, 1))}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="56"
+                    cx="60"
+                    cy="60"
+                    transform="rotate(-90 60 60)"
+                    style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                  />
+                </svg>
+                <span className="absolute text-lg font-bold text-slate-900">{(stats.inpP75 || 0)}ms</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Target &lt; 200ms</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Top Pages Chart */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
@@ -456,7 +714,7 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
                     fill="#8884d8"
                     dataKey="count"
                   >
-                    {stats.deviceBreakdown.map((entry, index) => (
+                    {stats.deviceBreakdown.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -569,6 +827,79 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
                   <TrendingUp className="w-4 h-4" />
                   <span className="text-sm">Funnel Analysis</span>
                 </button>
+                {/* Admin Heatmap Control */}
+                <div className="pt-4 mt-4 border-t border-slate-200">
+                  <h4 className="text-sm font-semibold text-slate-800 mb-2">Admin Heatmap Control</h4>
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Radius</label>
+                      <input
+                        type="number"
+                        min={8}
+                        max={64}
+                        value={heatmapCtrl.radius}
+                        onChange={(e) => setHeatmapCtrl((h) => ({ ...h, radius: Number(e.target.value) }))}
+                        className="w-full px-2 py-1 border border-slate-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Intensity</label>
+                      <input
+                        type="number"
+                        step={0.05}
+                        min={0}
+                        max={1}
+                        value={heatmapCtrl.intensity}
+                        onChange={(e) => setHeatmapCtrl((h) => ({ ...h, intensity: Number(e.target.value) }))}
+                        className="w-full px-2 py-1 border border-slate-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Mode</label>
+                      <select
+                        value={heatmapCtrl.mode}
+                        onChange={(e) => setHeatmapCtrl((h) => ({ ...h, mode: e.target.value as any }))}
+                        className="w-full px-2 py-1 border border-slate-300 rounded"
+                      >
+                        <option value="click">Click</option>
+                        <option value="scroll">Scroll</option>
+                        <option value="hover">Hover</option>
+                        <option value="mousemove">Mousemove</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        try {
+                          socketRef.current?.emit('admin-show-heatmap', {
+                            projectId: 'default',
+                            options: { radius: heatmapCtrl.radius, maxAlpha: heatmapCtrl.intensity, mode: heatmapCtrl.mode },
+                          });
+                          toast({ title: 'Heatmap show broadcasted' });
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="px-3 py-2 bg-purple-600 text-white rounded text-sm"
+                    >
+                      Show Heatmap
+                    </button>
+                    <button
+                      onClick={() => {
+                        try {
+                          socketRef.current?.emit('admin-hide-heatmap', { projectId: 'default' });
+                          toast({ title: 'Heatmap hide broadcasted' });
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="px-3 py-2 bg-slate-200 text-slate-800 rounded text-sm"
+                    >
+                      Hide Heatmap
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -1,31 +1,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   TrendingDown,
   TrendingUp,
   Plus,
-  Edit2,
   Trash2,
   Filter,
   Calendar,
   Users,
   BarChart3,
-  ArrowRight,
   RefreshCw,
   Download,
   ArrowDownRight,
-  Clock,
-  Zap,
   Target,
   X,
-  AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -61,14 +54,32 @@ interface FunnelAnalysisData {
   avgTimeToNext?: number;
 }
 
+interface FunnelAnalysisResponse {
+  success: boolean;
+  analysis: FunnelAnalysisData[];
+  baseline?: { entries: number; completed: number; rate: number };
+  filtered?: { entries: number; completed: number; rate: number };
+  conversionLiftPct?: number;
+  filtersApplied?: boolean;
+  filterSummary?: Record<string, any> | null;
+}
+
 const FunnelAnalysis: React.FC = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [selectedFunnel, setSelectedFunnel] = useState<Funnel | null>(null);
   const [analysisData, setAnalysisData] = useState<FunnelAnalysisData[]>([]);
+  const [baselineRate, setBaselineRate] = useState<number | null>(null);
+  const [filteredRate, setFilteredRate] = useState<number | null>(null);
+  const [conversionLift, setConversionLift] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [dateRange, setDateRange] = useState('7d');
+  const [device, setDevice] = useState<string>('');
+  const [country, setCountry] = useState<string>('');
+  const [utmSource, setUtmSource] = useState<string>('');
+  const [referrerContains, setReferrerContains] = useState<string>('');
+  const [pathPrefix, setPathPrefix] = useState<string>('');
   
   // Create funnel form state
   const [newFunnel, setNewFunnel] = useState({
@@ -87,7 +98,8 @@ const FunnelAnalysis: React.FC = () => {
     if (selectedFunnel) {
       analyzeFunnel(selectedFunnel._id);
     }
-  }, [selectedFunnel, dateRange]);
+  
+  }, [selectedFunnel, dateRange, device, country, utmSource, referrerContains, pathPrefix]);
 
   // Calculate metrics - must be before any early returns
   const metrics = useMemo(() => {
@@ -118,13 +130,68 @@ const FunnelAnalysis: React.FC = () => {
 
   const analyzeFunnel = async (funnelId: string) => {
     try {
-      const response = await axios.get(
-        `${API_URL}/api/funnels/${funnelId}/analyze?dateRange=${dateRange}`,
-        { withCredentials: true }
-      );
+      const params = new URLSearchParams({ dateRange });
+      if (device) params.append('device', device);
+      if (country) params.append('country', country);
+      if (utmSource) params.append('utmSource', utmSource);
+      if (referrerContains) params.append('referrerContains', referrerContains);
+      if (pathPrefix) params.append('pathPrefix', pathPrefix);
+      const url = `${API_URL}/api/funnels/${funnelId}/analyze?${params.toString()}`;
+      const response = await axios.get<FunnelAnalysisResponse>(url, { withCredentials: true });
       setAnalysisData(response.data.analysis || []);
+      setBaselineRate(response.data.baseline?.rate ?? null);
+      setFilteredRate(response.data.filtered?.rate ?? null);
+      setConversionLift(response.data.conversionLiftPct ?? null);
     } catch (err) {
       console.error('Failed to analyze funnel', err);
+    }
+  };
+
+  const downloadFunnelCSV = async () => {
+    if (!selectedFunnel) return;
+    try {
+      const params = new URLSearchParams({ dateRange });
+      if (device) params.append('device', device);
+      if (country) params.append('country', country);
+      if (utmSource) params.append('utmSource', utmSource);
+      if (referrerContains) params.append('referrerContains', referrerContains);
+      if (pathPrefix) params.append('pathPrefix', pathPrefix);
+      const resp = await axios.get(
+        `${API_URL}/api/funnels/${selectedFunnel._id}/export/csv?${params.toString()}`,
+        { withCredentials: true, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([resp.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `funnel-${selectedFunnel.name}-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download funnel CSV', err);
+    }
+  };
+
+  const downloadFunnelPDF = async () => {
+    if (!selectedFunnel) return;
+    try {
+      const params = new URLSearchParams({ dateRange });
+      if (device) params.append('device', device);
+      if (country) params.append('country', country);
+      if (utmSource) params.append('utmSource', utmSource);
+      if (referrerContains) params.append('referrerContains', referrerContains);
+      if (pathPrefix) params.append('pathPrefix', pathPrefix);
+      const resp = await axios.get(
+        `${API_URL}/api/funnels/${selectedFunnel._id}/export/pdf?${params.toString()}`,
+        { withCredentials: true, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `funnel-${selectedFunnel.name}-${new Date().toISOString().slice(0,10)}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download funnel PDF', err);
     }
   };
 
@@ -194,12 +261,7 @@ const FunnelAnalysis: React.FC = () => {
     return `${Math.round(seconds / 3600)}h`;
   };
 
-  const getTotalConversionRate = () => {
-    if (analysisData.length === 0) return 0;
-    const firstStep = analysisData[0].users;
-    const lastStep = analysisData[analysisData.length - 1].users;
-    return firstStep > 0 ? ((lastStep / firstStep) * 100).toFixed(1) : 0;
-  };
+  
 
   const getBarColor = (conversionRate: number) => {
     if (conversionRate >= 70) return '#10b981'; // green
@@ -268,6 +330,45 @@ const FunnelAnalysis: React.FC = () => {
               </select>
             </div>
 
+            {/* Segment filters */}
+            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-3 py-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <select
+                value={device}
+                onChange={(e) => setDevice(e.target.value)}
+                className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
+              >
+                <option value="">All devices</option>
+                <option value="desktop">Desktop</option>
+                <option value="mobile">Mobile</option>
+                <option value="tablet">Tablet</option>
+              </select>
+            </div>
+            <input
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="Country (e.g., US)"
+              className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <input
+              value={utmSource}
+              onChange={(e) => setUtmSource(e.target.value)}
+              placeholder="UTM source"
+              className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <input
+              value={referrerContains}
+              onChange={(e) => setReferrerContains(e.target.value)}
+              placeholder="Referrer contains"
+              className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <input
+              value={pathPrefix}
+              onChange={(e) => setPathPrefix(e.target.value)}
+              placeholder="Path prefix (e.g., /docs)"
+              className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            />
+
             <button
               onClick={() => selectedFunnel && analyzeFunnel(selectedFunnel._id)}
               className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm font-medium"
@@ -277,13 +378,29 @@ const FunnelAnalysis: React.FC = () => {
             </button>
 
             {selectedFunnel && (
-              <button
-                onClick={() => deleteFunnel(selectedFunnel._id)}
-                className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2 ml-auto text-sm font-medium"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={downloadFunnelCSV}
+                  className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm font-medium"
+                >
+                  <Download className="w-4 h-4" />
+                  CSV
+                </button>
+                <button
+                  onClick={downloadFunnelPDF}
+                  className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm font-medium"
+                >
+                  <Download className="w-4 h-4" />
+                  PDF
+                </button>
+                <button
+                  onClick={() => deleteFunnel(selectedFunnel._id)}
+                  className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2 text-sm font-medium"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -359,6 +476,25 @@ const FunnelAnalysis: React.FC = () => {
                   </div>
                 </div>
                 <p className="text-xs text-slate-500">Users who left the funnel</p>
+              </div>
+              {/* Lift card */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Conversion Lift</p>
+                    <p className={`text-3xl font-bold mt-2 ${conversionLift && conversionLift >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {conversionLift !== null ? `${conversionLift.toFixed(2)}%` : '—'}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-indigo-50 rounded-lg">
+                    <BarChart3 className="w-5 h-5 text-indigo-600" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {baselineRate !== null && filteredRate !== null
+                    ? `Baseline: ${baselineRate.toFixed(2)}% → Filtered: ${filteredRate.toFixed(2)}%`
+                    : 'Apply segment filters to see lift'}
+                </p>
               </div>
             </div>
 

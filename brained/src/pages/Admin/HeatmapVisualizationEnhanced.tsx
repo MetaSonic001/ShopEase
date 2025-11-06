@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   MousePointer2,
@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Download,
   Eye,
-  Filter,
   Monitor,
   Smartphone,
   Tablet,
@@ -17,7 +16,6 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import ExportToolbar from '../../components/ExportToolbar';
 
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -35,7 +33,7 @@ interface HeatmapMetadata {
 type HeatmapType = 'click' | 'scroll' | 'hover' | 'mousemove';
 type DeviceType = 'all' | 'desktop' | 'mobile' | 'tablet';
 
-const HeatmapVisualization: React.FC = () => {
+const HeatmapVisualizationEnhanced: React.FC = () => {
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   const [metadata, setMetadata] = useState<HeatmapMetadata | null>(null);
   const [loading, setLoading] = useState(false);
@@ -65,277 +63,6 @@ const HeatmapVisualization: React.FC = () => {
     }
   }, []);
 
-  const createMockPageStructure = (url: string): string => {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            margin: 0;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-            background: #f8f9fa;
-            color: #2d3748;
-          }
-          .page-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 40px;
-          }
-          .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 60px 40px;
-            border-radius: 12px;
-            margin-bottom: 40px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0 0 10px 0;
-            font-size: 2.5em;
-            font-weight: 700;
-          }
-          .header p {
-            margin: 0;
-            opacity: 0.9;
-            font-size: 1.1em;
-          }
-          .content-section {
-            margin: 30px 0;
-          }
-          .content-section h2 {
-            color: #2d3748;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-          }
-          .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 24px;
-            margin: 30px 0;
-          }
-          .product-card {
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 20px;
-            transition: all 0.3s;
-            cursor: pointer;
-          }
-          .product-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-            border-color: #cbd5e0;
-          }
-          .product-image {
-            width: 100%;
-            height: 200px;
-            background: linear-gradient(135deg, #667eea40 0%, #764ba240 100%);
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3em;
-            color: rgba(102, 126, 234, 0.3);
-          }
-          .product-card h3 {
-            font-size: 1.2em;
-            margin-bottom: 8px;
-            color: #2d3748;
-          }
-          .product-card p {
-            color: #718096;
-            margin-bottom: 16px;
-            line-height: 1.5;
-          }
-          .button {
-            background: #4299e1;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 600;
-            transition: all 0.3s;
-            display: inline-block;
-            text-decoration: none;
-          }
-          .button:hover {
-            background: #3182ce;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(66, 153, 225, 0.4);
-          }
-          .cta-section {
-            background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
-            padding: 60px 40px;
-            border-radius: 12px;
-            text-align: center;
-            margin: 40px 0;
-          }
-          .cta-section h2 {
-            font-size: 2em;
-            margin-bottom: 16px;
-            color: #2d3748;
-          }
-          .cta-section p {
-            font-size: 1.1em;
-            color: #4a5568;
-            margin-bottom: 24px;
-          }
-          .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 24px;
-            margin: 40px 0;
-          }
-          .feature-card {
-            background: white;
-            padding: 24px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            text-align: center;
-          }
-          .feature-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            color: white;
-            font-size: 1.5em;
-          }
-          .footer {
-            margin-top: 60px;
-            padding: 40px;
-            background: #2d3748;
-            color: white;
-            border-radius: 12px;
-            text-align: center;
-          }
-          .footer h3 {
-            margin-bottom: 16px;
-            font-size: 1.5em;
-          }
-          .footer p {
-            opacity: 0.8;
-            line-height: 1.8;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="page-container">
-          <div class="header">
-            <h1>🛍️ ${url.split('/').pop() || 'Products'}</h1>
-            <p>Interactive heatmap visualization showing real user behavior</p>
-          </div>
-          
-          <div class="content-section">
-            <h2>Featured Products</h2>
-            <div class="product-grid">
-              <div class="product-card">
-                <div class="product-image">🎮</div>
-                <h3>Gaming Console</h3>
-                <p>Next-gen gaming experience with 4K graphics and immersive gameplay</p>
-                <button class="button">View Details</button>
-              </div>
-              <div class="product-card">
-                <div class="product-image">📱</div>
-                <h3>Smartphone Pro</h3>
-                <p>Cutting-edge mobile technology with AI-powered camera</p>
-                <button class="button">View Details</button>
-              </div>
-              <div class="product-card">
-                <div class="product-image">💻</div>
-                <h3>Laptop Ultra</h3>
-                <p>Professional powerhouse with stunning display and performance</p>
-                <button class="button">View Details</button>
-              </div>
-              <div class="product-card">
-                <div class="product-image">🎧</div>
-                <h3>Wireless Headphones</h3>
-                <p>Premium sound quality with active noise cancellation</p>
-                <button class="button">View Details</button>
-              </div>
-              <div class="product-card">
-                <div class="product-image">⌚</div>
-                <h3>Smart Watch</h3>
-                <p>Track your fitness and stay connected on the go</p>
-                <button class="button">View Details</button>
-              </div>
-              <div class="product-card">
-                <div class="product-image">📷</div>
-                <h3>Camera Kit</h3>
-                <p>Professional photography equipment for creators</p>
-                <button class="button">View Details</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="content-section">
-            <h2>Why Shop With Us</h2>
-            <div class="features">
-              <div class="feature-card">
-                <div class="feature-icon">🚚</div>
-                <h3>Free Shipping</h3>
-                <p>On orders over $50</p>
-              </div>
-              <div class="feature-card">
-                <div class="feature-icon">🔒</div>
-                <h3>Secure Payment</h3>
-                <p>100% protected</p>
-              </div>
-              <div class="feature-card">
-                <div class="feature-icon">↩️</div>
-                <h3>Easy Returns</h3>
-                <p>30-day guarantee</p>
-              </div>
-              <div class="feature-card">
-                <div class="feature-icon">💬</div>
-                <h3>24/7 Support</h3>
-                <p>Always here to help</p>
-              </div>
-            </div>
-          </div>
-          
-          <div class="cta-section">
-            <h2>🎉 Special Offer!</h2>
-            <p>Sign up now and get 20% off your first order plus free shipping</p>
-            <button class="button" style="font-size: 1.1em; padding: 16px 32px;">Get Started Now</button>
-          </div>
-          
-          <div class="content-section">
-            <h2>About Our Products</h2>
-            <p style="line-height: 1.8; color: #4a5568; font-size: 1.1em;">
-              We carefully curate the best quality products from trusted brands worldwide. 
-              Our team is dedicated to ensuring your complete satisfaction with every purchase.
-              Shop with confidence knowing that we stand behind everything we sell with our 
-              comprehensive warranty and hassle-free return policy.
-            </p>
-          </div>
-          
-          <div class="footer">
-            <h3>Contact Us</h3>
-            <p>📧 Email: support@example.com</p>
-            <p>📞 Phone: (123) 456-7890</p>
-            <p style="margin-top: 24px; opacity: 0.6;">© 2025 Your Store. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-  };
-
   const fetchPageHTML = async (url: string) => {
     try {
       setPageLoading(true);
@@ -361,6 +88,181 @@ const HeatmapVisualization: React.FC = () => {
     } finally {
       setPageLoading(false);
     }
+  };
+
+  const createMockPageStructure = (url: string): string => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f8f9fa;
+          }
+          .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 40px;
+          }
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+          }
+          .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+          }
+          .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+          }
+          .content-section {
+            margin: 30px 0;
+          }
+          .content-section h2 {
+            color: #2d3748;
+            margin-bottom: 20px;
+          }
+          .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 24px;
+            margin: 30px 0;
+          }
+          .product-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+          }
+          .product-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .product-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(135deg, #667eea40 0%, #764ba240 100%);
+            border-radius: 8px;
+            margin-bottom: 16px;
+          }
+          .button {
+            background: #4299e1;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+          }
+          .button:hover {
+            background: #3182ce;
+            transform: translateY(-2px);
+          }
+          .cta-section {
+            background: #edf2f7;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 40px 0;
+          }
+          .footer {
+            margin-top: 60px;
+            padding: 40px;
+            background: #2d3748;
+            color: white;
+            border-radius: 12px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="page-container">
+          <div class="header">
+            <h1>Page: ${url}</h1>
+            <p>Interactive heatmap visualization of user behavior</p>
+          </div>
+          
+          <div class="content-section">
+            <h2>Popular Products</h2>
+            <div class="product-grid">
+              <div class="product-card">
+                <div class="product-image"></div>
+                <h3>Product 1</h3>
+                <p>Description of product 1</p>
+                <button class="button">View Details</button>
+              </div>
+              <div class="product-card">
+                <div class="product-image"></div>
+                <h3>Product 2</h3>
+                <p>Description of product 2</p>
+                <button class="button">View Details</button>
+              </div>
+              <div class="product-card">
+                <div class="product-image"></div>
+                <h3>Product 3</h3>
+                <p>Description of product 3</p>
+                <button class="button">View Details</button>
+              </div>
+              <div class="product-card">
+                <div class="product-image"></div>
+                <h3>Product 4</h3>
+                <p>Description of product 4</p>
+                <button class="button">View Details</button>
+              </div>
+              <div class="product-card">
+                <div class="product-image"></div>
+                <h3>Product 5</h3>
+                <p>Description of product 5</p>
+                <button class="button">View Details</button>
+              </div>
+              <div class="product-card">
+                <div class="product-image"></div>
+                <h3>Product 6</h3>
+                <p>Description of product 6</p>
+                <button class="button">View Details</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="cta-section">
+            <h2>Special Offer!</h2>
+            <p>Sign up now and get 20% off your first order</p>
+            <button class="button" style="margin-top: 20px;">Get Started</button>
+          </div>
+          
+          <div class="content-section">
+            <h2>Why Choose Us</h2>
+            <p style="line-height: 1.8; color: #4a5568;">
+              We provide the best quality products with excellent customer service. 
+              Our team is dedicated to ensuring your satisfaction with every purchase.
+              Shop with confidence knowing that we stand behind everything we sell.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <h3>Contact Information</h3>
+            <p>Email: info@example.com | Phone: (123) 456-7890</p>
+            <p style="margin-top: 20px; opacity: 0.7;">© 2025 Your Company. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
   };
 
   const fetchHeatmapData = async () => {
@@ -401,57 +303,53 @@ const HeatmapVisualization: React.FC = () => {
   };
 
   const drawHeatmap = () => {
-    const canvas = canvasRef.current;
-    const iframe = iframeRef.current;
-    if (!canvas || heatmapData.length === 0) return;
+    if (!canvasRef.current || !containerRef.current) return;
 
+    const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match iframe or container
-    if (iframe) {
-      canvas.width = iframe.clientWidth;
-      canvas.height = iframe.clientHeight;
-    } else if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-    }
+    // Set canvas size to match container
+    const rect = containerRef.current.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (!showOverlay) return;
+    if (!showOverlay || heatmapData.length === 0) return;
 
     // Find max intensity for normalization
-    const maxIntensity = Math.max(...heatmapData.map(p => p.value || 1));
+    const maxIntensity = Math.max(...heatmapData.map(p => p.value || 1), 1);
 
     // Draw each point
     heatmapData.forEach(point => {
-      // Use absolute coordinates from backend
       const x = point.x;
       const y = point.y;
 
       // Normalize intensity
       const normalizedIntensity = (point.value || 1) / maxIntensity;
 
-      // Create radial gradient with dynamic radius
-      const radius = 50 * (1 + normalizedIntensity * 0.5);
+      // Create radial gradient
+      const radius = 50 + (normalizedIntensity * 30); // Bigger radius for higher intensity
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
 
       // Color based on intensity and heatmap type
       const alpha = normalizedIntensity * intensity;
       if (heatmapType === 'click') {
-        gradient.addColorStop(0, `rgba(255, 0, 0, ${alpha})`);
-        gradient.addColorStop(0.5, `rgba(255, 100, 0, ${alpha * 0.5})`);
-        gradient.addColorStop(1, 'rgba(255, 200, 0, 0)');
+        gradient.addColorStop(0, `rgba(255, 0, 0, ${alpha * 0.9})`);
+        gradient.addColorStop(0.4, `rgba(255, 100, 0, ${alpha * 0.6})`);
+        gradient.addColorStop(0.7, `rgba(255, 200, 0, ${alpha * 0.3})`);
+        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
       } else if (heatmapType === 'scroll') {
-        gradient.addColorStop(0, `rgba(0, 100, 255, ${alpha})`);
-        gradient.addColorStop(0.5, `rgba(0, 200, 255, ${alpha * 0.5})`);
-        gradient.addColorStop(1, 'rgba(100, 255, 255, 0)');
+        gradient.addColorStop(0, `rgba(0, 100, 255, ${alpha * 0.9})`);
+        gradient.addColorStop(0.4, `rgba(0, 200, 255, ${alpha * 0.6})`);
+        gradient.addColorStop(0.7, `rgba(100, 255, 255, ${alpha * 0.3})`);
+        gradient.addColorStop(1, 'rgba(200, 255, 255, 0)');
       } else {
-        gradient.addColorStop(0, `rgba(100, 0, 255, ${alpha})`);
-        gradient.addColorStop(0.5, `rgba(200, 100, 255, ${alpha * 0.5})`);
+        gradient.addColorStop(0, `rgba(148, 0, 211, ${alpha * 0.9})`);
+        gradient.addColorStop(0.4, `rgba(186, 85, 211, ${alpha * 0.6})`);
+        gradient.addColorStop(0.7, `rgba(221, 160, 221, ${alpha * 0.3})`);
         gradient.addColorStop(1, 'rgba(255, 200, 255, 0)');
       }
 
@@ -461,11 +359,41 @@ const HeatmapVisualization: React.FC = () => {
   };
 
   const exportHeatmap = () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !containerRef.current) return;
 
+    // Create a temporary canvas with both iframe content and heatmap
+    const tempCanvas = document.createElement('canvas');
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
+
+    tempCanvas.width = containerRef.current.offsetWidth;
+    tempCanvas.height = containerRef.current.offsetHeight;
+
+    // Fill white background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Try to draw iframe content (may fail due to CORS)
+    if (iframeRef.current) {
+      try {
+        const iframeDoc = iframeRef.current.contentDocument;
+        if (iframeDoc) {
+          // This is a simplified approach - real implementation would need html2canvas or similar
+          ctx.fillStyle = '#f8f9fa';
+          ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        }
+      } catch (e) {
+        console.warn('[Heatmap] Could not access iframe content for export:', e);
+      }
+    }
+
+    // Draw heatmap on top
+    ctx.drawImage(canvasRef.current, 0, 0);
+
+    // Download
     const link = document.createElement('a');
     link.download = `heatmap-${heatmapType}-${Date.now()}.png`;
-    link.href = canvasRef.current.toDataURL();
+    link.href = tempCanvas.toDataURL();
     link.click();
   };
 
@@ -476,6 +404,7 @@ const HeatmapVisualization: React.FC = () => {
       case 'scroll':
         return <ScrollText className="w-5 h-5" />;
       case 'hover':
+      case 'mousemove':
         return <Activity className="w-5 h-5" />;
     }
   };
@@ -487,7 +416,6 @@ const HeatmapVisualization: React.FC = () => {
       case 'scroll':
         return 'from-blue-500 to-cyan-500';
       case 'hover':
-        return 'from-purple-500 to-pink-500';
       case 'mousemove':
         return 'from-purple-500 to-pink-500';
       default:
@@ -495,53 +423,25 @@ const HeatmapVisualization: React.FC = () => {
     }
   };
 
-  // CSV groups (memoize for stability)
-  const csvGroups = useMemo(() => {
-    const heatPoints = heatmapData.map(p => [p.x, p.y, p.value]);
-    const summary = metadata ? [[metadata.totalInteractions, metadata.uniqueUsers, heatmapType, deviceType, pageURL]] : [];
-    return [
-      {
-        label: 'Heat Points',
-        headers: ['x','y','value'],
-        rows: heatPoints,
-        filename: `heatmap-${heatmapType}-points.csv`
-      },
-      {
-        label: 'Summary',
-        headers: ['totalInteractions','uniqueUsers','type','deviceFilter','pageURL'],
-        rows: summary,
-        filename: `heatmap-${heatmapType}-summary.csv`
-      }
-    ];
-  }, [heatmapData, metadata, heatmapType, deviceType, pageURL]);
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
       <div className="border-b border-slate-200/50 bg-white sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between mb-4 gap-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Heatmap Visualization</h1>
-              <p className="text-sm text-slate-600 mt-1">Visualize user interactions with click, scroll, and hover heatmaps</p>
+              <h1 className="text-3xl font-bold text-slate-900">🔥 Heatmap Visualization</h1>
+              <p className="text-sm text-slate-600 mt-1">Visualize user interactions with DOM recreation and real-time overlays</p>
             </div>
-            <div className="flex items-center gap-2">
-              {heatmapData.length > 0 && (
-                <button
-                  onClick={exportHeatmap}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 font-medium shadow-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  PNG
-                </button>
-              )}
-              <ExportToolbar
-                targetRef={containerRef as any}
-                pdfFilename={`heatmap-${heatmapType}.pdf`}
-                csvGroups={csvGroups as any}
-                size="sm"
-              />
-            </div>
+            {heatmapData.length > 0 && (
+              <button
+                onClick={exportHeatmap}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 font-medium shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Export PNG
+              </button>
+            )}
           </div>
 
           {/* Filters */}
@@ -557,10 +457,10 @@ const HeatmapVisualization: React.FC = () => {
               />
               <button
                 onClick={fetchHeatmapData}
-                disabled={loading}
+                disabled={loading || pageLoading}
                 className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium shadow-sm"
               >
-                {loading ? (
+                {loading || pageLoading ? (
                   <>
                     <RefreshCw className="w-5 h-5 animate-spin" />
                     Loading...
@@ -580,15 +480,15 @@ const HeatmapVisualization: React.FC = () => {
                 <button
                   key={type}
                   onClick={() => setHeatmapType(type)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${heatmapType === type
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
+                    heatmapType === type
                       ? `bg-gradient-to-r ${getHeatmapColor()} text-white shadow-lg`
                       : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
+                  }`}
                 >
                   {type === 'click' && <MousePointer2 className="w-4 h-4" />}
                   {type === 'scroll' && <ScrollText className="w-4 h-4" />}
-                  {type === 'hover' && <Activity className="w-4 h-4" />}
-                  {type === 'mousemove' && <Activity className="w-4 h-4" />}
+                  {(type === 'hover' || type === 'mousemove') && <Activity className="w-4 h-4" />}
                   {type === 'mousemove' ? 'Move' : type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
@@ -598,10 +498,11 @@ const HeatmapVisualization: React.FC = () => {
                   <button
                     key={device}
                     onClick={() => setDeviceType(device)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${deviceType === device
+                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                      deviceType === device
                         ? 'bg-slate-900 text-white shadow-lg'
                         : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                      }`}
+                    }`}
                   >
                     {device === 'desktop' && <Monitor className="w-4 h-4 inline mr-1" />}
                     {device === 'mobile' && <Smartphone className="w-4 h-4 inline mr-1" />}
@@ -622,7 +523,7 @@ const HeatmapVisualization: React.FC = () => {
                     onChange={(e) => setShowOverlay(e.target.checked)}
                     className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Show Overlay</span>
+                  <span className="text-sm font-medium text-slate-700">Show Heatmap Overlay</span>
                 </label>
 
                 <div className="flex items-center gap-2">
@@ -648,62 +549,52 @@ const HeatmapVisualization: React.FC = () => {
         {/* Stats Cards */}
         {heatmapData.length > 0 && metadata && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
-              <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${getHeatmapColor().replace('from-', 'from-').replace(' to-', '/50 to-')}/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl`}></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 bg-gradient-to-r ${getHeatmapColor()} rounded-lg flex items-center justify-center`}>
-                    {getHeatmapIcon()}
-                  </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className={`w-12 h-12 bg-gradient-to-r ${getHeatmapColor()} rounded-lg flex items-center justify-center text-white`}>
+                  {getHeatmapIcon()}
                 </div>
-                <p className="text-3xl font-bold text-slate-900 mb-1">{metadata.totalInteractions.toLocaleString()}</p>
-                <p className="text-sm text-slate-600">Total Interactions</p>
               </div>
+              <p className="text-3xl font-bold text-slate-900 mb-1">{metadata.totalInteractions.toLocaleString()}</p>
+              <p className="text-sm text-slate-600">Total Interactions</p>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-6 h-6 text-blue-600" />
-                  </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-blue-600" />
                 </div>
-                <p className="text-3xl font-bold text-slate-900 mb-1">{metadata.uniqueUsers.toLocaleString()}</p>
-                <p className="text-sm text-slate-600">Unique Users</p>
               </div>
+              <p className="text-3xl font-bold text-slate-900 mb-1">{metadata.uniqueUsers.toLocaleString()}</p>
+              <p className="text-sm text-slate-600">Unique Users</p>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Target className="w-6 h-6 text-orange-600" />
-                  </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Target className="w-6 h-6 text-orange-600" />
                 </div>
-                <p className="text-3xl font-bold text-slate-900 mb-1">{heatmapData.length.toLocaleString()}</p>
-                <p className="text-sm text-slate-600">Heat Points</p>
               </div>
+              <p className="text-3xl font-bold text-slate-900 mb-1">{heatmapData.length.toLocaleString()}</p>
+              <p className="text-sm text-slate-600">Heat Points</p>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6 overflow-hidden relative group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-full blur-2xl"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-green-600" />
-                  </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-600" />
                 </div>
-                <p className="text-3xl font-bold text-slate-900 mb-1">{Math.max(...heatmapData.map(p => p.value || 1))}</p>
-                <p className="text-sm text-slate-600">Peak Value</p>
               </div>
+              <p className="text-3xl font-bold text-slate-900 mb-1">
+                {Math.max(...heatmapData.map(p => p.value || 1), 0).toLocaleString()}
+              </p>
+              <p className="text-sm text-slate-600">Peak Intensity</p>
             </div>
           </div>
         )}
 
-        {/* Heatmap Canvas */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Heatmap Canvas with DOM */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
           <div className="bg-slate-900 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2 text-white">
               {getHeatmapIcon()}
@@ -713,8 +604,20 @@ const HeatmapVisualization: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-4">
+              {pageLoading && (
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Loading page...</span>
+                </div>
+              )}
+              {domReady && (
+                <div className="flex items-center gap-2 text-sm text-green-400">
+                  <Eye className="w-4 h-4" />
+                  <span>DOM Ready</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-sm text-slate-300">
-                <Filter className="w-4 h-4" />
+                <Target className="w-4 h-4" />
                 <span>
                   {heatmapData.length} point{heatmapData.length !== 1 ? 's' : ''}
                 </span>
@@ -724,20 +627,10 @@ const HeatmapVisualization: React.FC = () => {
 
           <div
             ref={containerRef}
-            className="relative bg-slate-50"
-            style={{ minHeight: '600px' }}
+            className="relative bg-slate-50 overflow-auto"
+            style={{ minHeight: '800px', maxHeight: '1200px' }}
           >
-            {/* Loading State */}
-            {pageLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-20">
-                <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                  <p className="text-slate-600 font-medium">Loading page content...</p>
-                </div>
-              </div>
-            )}
-
-            {/* IFrame for page rendering */}
+            {/* IFrame for actual page rendering */}
             {pageHTML && domReady && (
               <iframe
                 ref={iframeRef}
@@ -746,8 +639,9 @@ const HeatmapVisualization: React.FC = () => {
                 style={{ minHeight: '800px' }}
                 sandbox="allow-same-origin"
                 onLoad={() => {
-                  console.log('[Heatmap] IFrame loaded, drawing heatmap');
-                  drawHeatmap();
+                  console.log('[Heatmap] IFrame loaded, ready to draw heatmap');
+                  // Trigger heatmap redraw after iframe loads
+                  setTimeout(() => drawHeatmap(), 300);
                 }}
               />
             )}
@@ -759,8 +653,20 @@ const HeatmapVisualization: React.FC = () => {
               style={{ mixBlendMode: 'multiply' }}
             />
 
+            {/* Loading State */}
+            {(loading || pageLoading) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-20">
+                <div className="text-center">
+                  <Loader2 className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-spin" />
+                  <p className="text-slate-600 text-lg font-semibold">
+                    {pageLoading ? 'Loading page content...' : 'Generating heatmap...'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Empty State */}
-            {heatmapData.length === 0 && !pageLoading && (
+            {!loading && !pageLoading && heatmapData.length === 0 && !pageHTML && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <div className={`w-20 h-20 bg-gradient-to-r ${getHeatmapColor()} rounded-full flex items-center justify-center mx-auto mb-4 opacity-20`}>
@@ -772,12 +678,12 @@ const HeatmapVisualization: React.FC = () => {
               </div>
             )}
 
-            {/* Warning if no DOM ready */}
-            {heatmapData.length > 0 && !domReady && !pageLoading && (
+            {/* Error State */}
+            {!loading && !pageLoading && heatmapData.length === 0 && pageHTML && (
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
-                <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg">
+                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
                   <AlertCircle className="w-5 h-5" />
-                  <span className="text-sm font-medium">Page content loading...</span>
+                  <span className="text-sm font-medium">No interaction data found for this page</span>
                 </div>
               </div>
             )}
@@ -788,15 +694,15 @@ const HeatmapVisualization: React.FC = () => {
             <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-slate-700">Intensity:</span>
+                  <span className="text-sm font-medium text-slate-700">Heat Intensity:</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">Low</span>
-                    <div className={`w-32 h-4 rounded bg-gradient-to-r ${getHeatmapColor()}`}></div>
+                    <div className={`w-48 h-6 rounded bg-gradient-to-r ${getHeatmapColor()}`}></div>
                     <span className="text-xs text-slate-500">High</span>
                   </div>
                 </div>
                 <p className="text-sm text-slate-600">
-                  Warmer colors indicate higher user activity
+                  Warmer colors = Higher user activity • Cooler colors = Lower activity
                 </p>
               </div>
             </div>
@@ -807,4 +713,4 @@ const HeatmapVisualization: React.FC = () => {
   );
 };
 
-export default HeatmapVisualization;
+export default HeatmapVisualizationEnhanced;

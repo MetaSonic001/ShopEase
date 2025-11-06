@@ -170,18 +170,40 @@ const CohortAnalysis: React.FC = () => {
     return num.toString();
   };
 
-  const exportData = () => {
-    const data = {
-      cohort: selectedCohort,
-      retention: retentionData,
-      behavior: behaviorData,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cohort-${selectedCohort?.name}-${new Date().toISOString()}.json`;
-    a.click();
+  const downloadCohortCSV = async () => {
+    if (!selectedCohort) return;
+    try {
+      const resp = await axios.get(
+        `${API_URL}/api/cohorts/${selectedCohort._id}/export/csv?dateRange=${dateRange}`,
+        { withCredentials: true, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([resp.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cohort-${selectedCohort.name}-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to download cohort CSV', e);
+    }
+  };
+
+  const downloadCohortPDF = async () => {
+    if (!selectedCohort) return;
+    try {
+      const resp = await axios.get(
+        `${API_URL}/api/cohorts/${selectedCohort._id}/export/pdf?dateRange=${dateRange}`,
+        { withCredentials: true, responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cohort-${selectedCohort.name}-${new Date().toISOString().slice(0,10)}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to download cohort PDF', e);
+    }
   };
 
   if (loading) {
@@ -258,13 +280,22 @@ const CohortAnalysis: React.FC = () => {
 
           {selectedCohort && (
             <>
-              <button
-                onClick={exportData}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={downloadCohortCSV}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  CSV
+                </button>
+                <button
+                  onClick={downloadCohortPDF}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  PDF
+                </button>
+              </div>
               <button
                 onClick={() => deleteCohort(selectedCohort._id)}
                 className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-all shadow-sm hover:shadow flex items-center gap-2 ml-auto"

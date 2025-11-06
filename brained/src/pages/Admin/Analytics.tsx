@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import io from 'socket.io-client';
 import api from '../../services/api';
+import { toast } from '@/components/ui/use-toast';
 import {
   ResponsiveContainer,
   BarChart,
@@ -34,6 +36,8 @@ import {
   ArrowDown,
 } from 'lucide-react';
 
+const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+
 const AdminAnalytics: React.FC = () => {
   const [eventsSummary, setEventsSummary] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any[]>([]);
@@ -63,7 +67,30 @@ const AdminAnalytics: React.FC = () => {
     } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    load(); 
+
+    // Setup WebSocket for real-time updates
+    const socket = io(API_URL, { withCredentials: true });
+
+    socket.on('connect', () => {
+      console.log('[Analytics] Connected to WebSocket');
+      socket.emit('join', 'default');
+    });
+
+    socket.on('session-recorded', ({ sessionId, pageURL, duration }: any) => {
+      console.log('[Analytics] New session recorded:', sessionId);
+      toast({
+        title: 'New Session Recorded',
+        description: `${Math.round((duration || 0) / 1000)}s session on ${pageURL || 'unknown page'}`,
+      });
+      load();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const exportCSV = () => {
     const u = new URL('/api/analytics/export/csv', baseURL);
