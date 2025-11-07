@@ -56,7 +56,20 @@ const InsightsDashboard: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get('/api/insights/weekly-summary');
-      setSummary(response.data);
+      const d = response.data;
+      // Defensive: validate shape before setting state
+      if (d && typeof d === 'object') {
+        setSummary({
+          topErrors: Array.isArray(d.topErrors) ? d.topErrors : [],
+          topRageSelectors: Array.isArray(d.topRageSelectors) ? d.topRageSelectors : [],
+          topSlowPages: Array.isArray(d.topSlowPages) ? d.topSlowPages : [],
+          recommendedActions: Array.isArray(d.recommendedActions) ? d.recommendedActions : [],
+        });
+      } else {
+        console.warn('Unexpected weekly-summary payload:', d);
+        toast({ variant: 'destructive', title: 'Error', description: 'Invalid insights data received' });
+        setSummary(null);
+      }
     } catch (error) {
       console.error('Failed to fetch insights:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load insights' });

@@ -108,6 +108,8 @@ const seedTypes: SeedTypeConfig[] = [
 
 export default function SeedDataManager() {
   const { toast } = useToast();
+  // Use Vite-provided API base or fallback to empty string (will cause relative requests)
+  const API_BASE = (import.meta.env.VITE_API_BASE as string) || '';
   const [statuses, setStatuses] = useState<SeedStatuses | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -119,9 +121,25 @@ export default function SeedDataManager() {
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch('/api/seed/status');
-      const data = await response.json();
-      setStatuses(data);
+  const response = await fetch(`${API_BASE}/api/seed/status`);
+      // Read body as text first so we can surface HTML/error pages and avoid
+      // "body stream already read" when attempting both json() and text().
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${text.slice(0,200)}`);
+      }
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.slice(0,200)}`);
+      }
+      // Basic shape validation
+      if (data && typeof data === 'object') {
+        setStatuses(data as SeedStatuses);
+      } else {
+        throw new Error('Unexpected seed status payload');
+      }
     } catch (error) {
       console.error('Error fetching seed status:', error);
       toast({
@@ -141,27 +159,9 @@ export default function SeedDataManager() {
   const handleSeed = async (seedType: string, count?: number) => {
     setActionLoading(seedType);
     try {
-      const endpoint = seedType === 'products' 
-        ? '/api/seed/products'
-        : `/api/seed/data/${seedType}`;
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count }),
-      });
-
-      const data = await response.json();
-
-      if (data.success || response.ok) {
-        toast({
-          title: 'Success',
-          description: `Seeded ${seedType.replace('-', ' ')} successfully`,
-        });
-        await fetchStatus();
-      } else {
-        throw new Error(data.message || data.error || 'Seeding failed');
-      }
+      await seedOne(seedType, count);
+      toast({ title: 'Success', description: `Seeded ${seedType.replace('-', ' ')} successfully` });
+      await fetchStatus();
     } catch (error: any) {
       console.error(`Error seeding ${seedType}:`, error);
       toast({
@@ -175,24 +175,75 @@ export default function SeedDataManager() {
     }
   };
 
+  // Helper to perform the fetch and return parsed JSON or throw with a readable message
+  const seedOne = async (seedType: string, count?: number) => {
+  const endpoint = seedType === 'products' ? `${API_BASE}/api/seed/products` : `${API_BASE}/api/seed/data/${seedType}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count }),
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${text.slice(0,200)}`);
+    }
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch (e) {
+      throw new Error(`Invalid JSON response: ${text.slice(0,200)}`);
+    }
+  };
+
+  const handleSeedAll = async () => {
+    // Seed all configured types sequentially so the server isn't overwhelmed and to show progress
+    setActionLoading('all');
+    const errors: string[] = [];
+    for (const t of seedTypes) {
+      try {
+        await seedOne(t.id, t.defaultCount);
+        // small delay so the server has time to process heavy seeders (optional)
+        await new Promise((r) => setTimeout(r, 200));
+      } catch (err: any) {
+        console.error(`Seed all: failed to seed ${t.id}:`, err);
+        errors.push(`${t.id}: ${err?.message || String(err)}`);
+      }
+    }
+    await fetchStatus();
+    if (errors.length > 0) {
+      toast({ title: 'Seed All Completed with errors', description: errors.join('; '), variant: 'destructive' });
+    } else {
+      toast({ title: 'Seed All Completed', description: 'All selected seeders ran successfully' });
+    }
+    setActionLoading(null);
+  };
+
   const handleClear = async (seedType: string) => {
     setActionLoading(seedType);
     try {
-      const endpoint = `/api/seed/data/${seedType}`;
-      const response = await fetch(endpoint, {
-        method: 'DELETE',
-      });
+      const endpoint = `${API_BASE}/api/seed/data/${seedType}`;
+      const response = await fetch(endpoint, { method: 'DELETE' });
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${text.slice(0,200)}`);
+      }
 
-      const data = await response.json();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.slice(0,200)}`);
+      }
 
-      if (data.success || response.ok) {
+      if (data && (data.success || response.ok)) {
         toast({
           title: 'Success',
           description: `Cleared ${data.deletedCount || 0} seeded ${seedType.replace('-', ' ')}`,
         });
         await fetchStatus();
       } else {
-        throw new Error(data.message || data.error || 'Clearing failed');
+        throw new Error((data && (data.message || data.error)) || 'Clearing failed');
       }
     } catch (error: any) {
       console.error(`Error clearing ${seedType}:`, error);
@@ -242,7 +293,24 @@ export default function SeedDataManager() {
             Manage test data for development and testing. Seed data is marked separately from manual entries.
           </p>
         </div>
-        <ExportToolbar />
+        <div className="flex items-center gap-2">
+          <ExportToolbar />
+          <Button
+            onClick={() => {
+              // Ask for confirmation before seeding everything
+              setConfirmDialog({ open: true, type: 'seed', seedType: 'all' });
+            }}
+            disabled={!!actionLoading}
+            size="sm"
+          >
+            {actionLoading === 'all' ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <PlusCircle className="h-4 w-4 mr-2" />
+            )}
+            Seed All
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -392,16 +460,23 @@ export default function SeedDataManager() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDialog?.type === 'seed' ? (
-                <>
-                  This will generate new test data for{' '}
-                  <strong>{confirmDialog.seedType.replace('-', ' ')}</strong>.
-                  {seedTypes.find((t) => t.id === confirmDialog.seedType)?.defaultCount && (
-                    <span className="block mt-2 text-sm">
-                      Default count:{' '}
-                      {seedTypes.find((t) => t.id === confirmDialog.seedType)?.defaultCount} items
-                    </span>
-                  )}
-                </>
+                confirmDialog.seedType === 'all' ? (
+                  <>
+                    This will run all configured seeders (one after another). It may take a few
+                    moments depending on the dataset sizes.
+                  </>
+                ) : (
+                  <>
+                    This will generate new test data for{' '}
+                    <strong>{confirmDialog.seedType.replace('-', ' ')}</strong>.
+                    {seedTypes.find((t) => t.id === confirmDialog.seedType)?.defaultCount && (
+                      <span className="block mt-2 text-sm">
+                        Default count:{' '}
+                        {seedTypes.find((t) => t.id === confirmDialog.seedType)?.defaultCount} items
+                      </span>
+                    )}
+                  </>
+                )
               ) : (
                 <>
                   This will permanently delete all seeded{' '}
@@ -416,14 +491,18 @@ export default function SeedDataManager() {
             <AlertDialogAction
               onClick={() => {
                 if (confirmDialog?.type === 'seed') {
-                  const config = seedTypes.find((t) => t.id === confirmDialog.seedType);
-                  handleSeed(confirmDialog.seedType, config?.defaultCount);
+                  if (confirmDialog.seedType === 'all') {
+                    handleSeedAll();
+                  } else {
+                    const config = seedTypes.find((t) => t.id === confirmDialog.seedType);
+                    handleSeed(confirmDialog.seedType, config?.defaultCount);
+                  }
                 } else if (confirmDialog?.type === 'clear') {
                   handleClear(confirmDialog.seedType);
                 }
               }}
             >
-              {confirmDialog?.type === 'seed' ? 'Seed' : 'Clear'}
+              {confirmDialog?.type === 'seed' ? (confirmDialog.seedType === 'all' ? 'Seed All' : 'Seed') : 'Clear'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

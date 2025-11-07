@@ -33,8 +33,10 @@ const TrendsDashboard: React.FC = () => {
         api.get(`/api/trends/rage?hours=${hours}`),
         api.get(`/api/trends/errors?hours=${hours}`),
       ]);
-      setRageTrends(rageResponse.data);
-      setErrorTrends(errorResponse.data);
+      // Defensive: ensure API returned arrays before setting state
+      const safeArray = (v: any) => (Array.isArray(v) ? v as TrendBucket[] : []);
+      setRageTrends(safeArray(rageResponse.data));
+      setErrorTrends(safeArray(errorResponse.data));
     } catch (error) {
       console.error('Failed to fetch trends:', error);
       toast({

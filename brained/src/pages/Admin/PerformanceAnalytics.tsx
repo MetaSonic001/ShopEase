@@ -12,7 +12,8 @@ import {
   RefreshCw,
   Download
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import FilterBar, { type FilterValues } from '@/components/FilterBar';
 
 interface PerformanceMetric {
   pageURL: string;
@@ -33,9 +34,8 @@ const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).
 
 const PerformanceAnalytics: React.FC = () => {
   const [metrics, setMetrics] = useState<PerformanceMetric[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('24h');
-  const [selectedPage, setSelectedPage] = useState('all');
+  const [, setLoading] = useState(true);
+  const [filters, setFilters] = useState<FilterValues>({ dateRange: '24h', device: 'all', page: undefined });
 
   useEffect(() => {
     fetchPerformanceData();
@@ -60,15 +60,18 @@ const PerformanceAnalytics: React.FC = () => {
     return () => {
       socket.disconnect();
     };
-  }, [dateRange, selectedPage]);
+  }, [filters.dateRange, filters.page, filters.device, filters.cohort, filters.variant]);
 
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/analytics/performance', {
         params: {
-          range: dateRange,
-          page: selectedPage === 'all' ? undefined : selectedPage,
+          range: filters.dateRange,
+          page: filters.page,
+          device: filters.device === 'all' ? undefined : filters.device,
+          cohort: filters.cohort || undefined,
+          variant: filters.variant || undefined,
         },
       });
       setMetrics(response.data.metrics || []);
@@ -116,7 +119,7 @@ const PerformanceAnalytics: React.FC = () => {
 
     metrics.forEach(metric => {
       const date = new Date(metric.timestamp);
-      const key = dateRange === '24h'
+      const key = filters.dateRange === '24h'
         ? `${date.getHours()}:00`
         : date.toLocaleDateString();
 
@@ -150,51 +153,22 @@ const PerformanceAnalytics: React.FC = () => {
         <p className="text-gray-600">Monitor Core Web Vitals and site performance metrics</p>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">Time Range:</span>
-          </div>
-
-          <div className="flex gap-2">
-            {['24h', '7d', '30d'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setDateRange(range)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === range
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <select
-              value={selectedPage}
-              onChange={(e) => setSelectedPage(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Pages</option>
-              {uniquePages.slice(0, 10).map((page) => (
-                <option key={page} value={page}>{page}</option>
-              ))}
-            </select>
-
-            <button
-              onClick={fetchPerformanceData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Unified FilterBar */}
+      <FilterBar
+        value={filters}
+        pages={uniquePages}
+        onChange={setFilters}
+        onApply={fetchPerformanceData}
+        endAdornment={(
+          <button
+            onClick={fetchPerformanceData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        )}
+      />
 
       {/* Core Web Vitals Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

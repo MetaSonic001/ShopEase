@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import io from 'socket.io-client';
 import { toast } from '@/components/ui/use-toast';
 import { 
@@ -87,6 +88,8 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
     mode: 'click' as 'click' | 'scroll' | 'hover' | 'mousemove',
   });
 
+  const auth = useAuth();
+
   useEffect(() => {
     // Set greeting based on time
     const hour = new Date().getHours();
@@ -103,7 +106,9 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
       } catch (e) {}
     }
 
-    fetchDashboardData();
+  // Don’t fetch until we have an access token (prevents 401 spam during initialization)
+  if (!auth?.accessToken) return;
+  fetchDashboardData();
     
     // Setup Socket.IO for real-time updates
   const socket = io(SOCKET_URL, { withCredentials: true });
@@ -150,7 +155,7 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [auth?.accessToken]);
 
   const fetchDashboardData = async () => {
     try {
@@ -158,25 +163,21 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
       
       // Fetch from tracking APIs and enhanced overview in parallel
       const [sessionsRes, interactionsRes, summaryRes, overviewRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tracking/sessions`, {
+        api.get('/api/tracking/sessions', {
           params: { page: 1, limit: 100, isComplete: false },
-          withCredentials: true,
         }),
-        axios.get(`${API_URL}/api/tracking/interactions/summary`, {
+        api.get('/api/tracking/interactions/summary', {
           params: { 
             startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
             groupBy: 'eventType'
           },
-          withCredentials: true,
         }),
-        axios.get(`${API_URL}/api/tracking/interactions/summary`, {
+        api.get('/api/tracking/interactions/summary', {
           params: { 
             startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
           },
-          withCredentials: true,
         }),
-        axios.get(`${API_URL}/api/dashboard/overview`, {
-          withCredentials: true,
+        api.get('/api/dashboard/overview', {
           params: {
             device: filters.device || undefined,
             country: filters.country || undefined,
@@ -265,9 +266,8 @@ const RealTimeAnalyticsDashboard: React.FC = () => {
       console.error('Failed to fetch dashboard data', err);
       // Try fallback to old API which now includes enhanced metrics
       try {
-        const response = await axios.get(`${API_URL}/api/dashboard/overview`, {
-          withCredentials: true,
-        });
+        if (!auth?.accessToken) return;
+        const response = await api.get('/api/dashboard/overview');
         setStats(prev => ({
           ...prev,
           ...response.data,

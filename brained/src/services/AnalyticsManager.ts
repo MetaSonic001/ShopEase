@@ -4,7 +4,7 @@ import SessionRecorder from './sessionRecorder';
 const API_URL = (import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
 interface AnalyticsEvent {
-  eventType: 'click' | 'hover' | 'scroll' | 'mousemove' | 'input' | 'submit' | 'pageview' | 'custom';
+  eventType: 'click' | 'hover' | 'scroll' | 'scroll_depth' | 'mousemove' | 'input' | 'submit' | 'pageview' | 'custom';
   eventName: string;
   pageURL: string;
   metadata?: Record<string, any>;
@@ -41,6 +41,7 @@ class AnalyticsManager {
   private lastScroll: number = 0;
   private mouseMoveThrottle: number = 100;
   private scrollThrottle: number = 500;
+  private maxScrollDepth: number = 0; // track maximum depth reached during page lifecycle
 
   // Session recording (rrweb)
   private sessionRecorder: SessionRecorder | null = null;
@@ -55,6 +56,8 @@ class AnalyticsManager {
   // Hover tracking
   private hoverStartTime: Map<HTMLElement, number> = new Map();
   private hoverThreshold: number = 1000; // 1 second
+  private lastHoverEmitTime: WeakMap<HTMLElement, number> = new WeakMap();
+  private minHoverEmitGapMs: number = 1500; // avoid spamming same element
 
   // Config
   private config: AnalyticsManagerConfig;
@@ -236,6 +239,12 @@ class AnalyticsManager {
 
     const scrollDepth = this.getScrollDepth();
 
+    // Update max scroll depth for milestone emission & final engagement summary
+    if (scrollDepth > this.maxScrollDepth) {
+      this.maxScrollDepth = scrollDepth;
+      this.emitScrollDepthMilestone(this.maxScrollDepth);
+    }
+
     this.queueEvent({
       eventType: 'scroll',
       eventName: 'scroll',
@@ -250,6 +259,27 @@ class AnalyticsManager {
     });
 
     this.updateLastActivity();
+  }
+
+  /**
+   * Emit a milestone event when user surpasses specific scroll depth thresholds.
+   * Milestones: 25, 50, 75, 90, 100
+   */
+  private emitScrollDepthMilestone(depth: number): void {
+    const rounded = Math.floor(depth);
+    const milestones = [25, 50, 75, 90, 100];
+    if (!milestones.includes(rounded)) return;
+
+    this.queueEvent({
+      eventType: 'scroll_depth',
+      eventName: 'scroll_depth_milestone',
+      pageURL: window.location.href,
+      metadata: {
+        milestone: rounded,
+        pageTitle: document.title,
+        device: this.getDeviceType(),
+      },
+    });
   }
 
   private handleMouseOver(e: MouseEvent): void {
@@ -273,6 +303,14 @@ class AnalyticsManager {
     // Only track hovers longer than threshold
     if (hoverDuration < this.hoverThreshold) return;
 
+    // De-duplicate rapid repeat hover events on same element
+    const lastEmit = this.lastHoverEmitTime.get(target) || 0;
+    if (Date.now() - lastEmit < this.minHoverEmitGapMs) return;
+    this.lastHoverEmitTime.set(target, Date.now());
+
+    const attrs = this.extractElementAttributes(target);
+    const selector = this.computeSelector(target);
+
     this.queueEvent({
       eventType: 'hover',
       eventName: 'hover',
@@ -281,6 +319,13 @@ class AnalyticsManager {
         element: target.tagName.toLowerCase(),
         elementId: target.id || undefined,
         className: target.className || undefined,
+        selector,
+        role: attrs.role,
+        ariaLabel: attrs.ariaLabel,
+        dataTrack: attrs.dataTrack,
+        dataTestId: attrs.dataTestId,
+        name: attrs.name,
+        type: attrs.type,
         text: target.innerText?.substring(0, 100) || undefined,
         hoverDuration,
         pageTitle: document.title,
@@ -342,6 +387,8 @@ class AnalyticsManager {
       metadata: {
         pageTitle: document.title,
         timeOnPage: this.getTimeOnPage(),
+        activeTimeSeconds: this.getActiveTime(),
+        maxScrollDepth: Math.round(this.maxScrollDepth),
       },
     });
   }
@@ -399,6 +446,40 @@ class AnalyticsManager {
 
   private getTimeOnPage(): number {
     return Math.floor((Date.now() - this.pageLoadTime) / 1000);
+  }
+
+  // Build a short but stable-ish selector for an element
+  private computeSelector(el: HTMLElement): string {
+    try {
+      const parts: string[] = [];
+      let node: HTMLElement | null = el;
+      let depth = 0;
+      while (node && depth < 5) {
+        const tag = node.tagName.toLowerCase();
+        const id = node.id ? `#${node.id}` : '';
+        const cls = (node.className && typeof node.className === 'string')
+          ? '.' + node.className.trim().split(/\s+/).slice(0, 2).join('.')
+          : '';
+        parts.unshift(`${tag}${id}${cls}`);
+        node = node.parentElement;
+        depth++;
+      }
+      return parts.join(' > ');
+    } catch {
+      return el.tagName.toLowerCase();
+    }
+  }
+
+  // Extract commonly useful attributes for analytics
+  private extractElementAttributes(el: HTMLElement): Record<string, any> {
+    return {
+      role: el.getAttribute('role') || undefined,
+      ariaLabel: el.getAttribute('aria-label') || undefined,
+      dataTrack: el.getAttribute('data-pagepulse-track') || el.getAttribute('data-pp-track') || undefined,
+      dataTestId: el.getAttribute('data-testid') || undefined,
+      name: (el as HTMLInputElement).name || undefined,
+      type: (el as HTMLInputElement).type || undefined,
+    };
   }
 
   private getDeviceType(): string {
@@ -516,6 +597,7 @@ class AnalyticsManager {
     }
 
     this.pageLoadTime = Date.now();
+    this.maxScrollDepth = 0; // reset per pageview
 
     this.queueEvent({
       eventType: 'pageview',
@@ -583,6 +665,19 @@ class AnalyticsManager {
     if (this.activeTimeInterval) {
       clearInterval(this.activeTimeInterval);
     }
+    // Emit final engagement & scroll depth summary before teardown
+    this.queueEvent({
+      eventType: 'custom',
+      eventName: 'engagement_summary',
+      pageURL: window.location.href,
+      metadata: {
+        activeTimeSeconds: this.getActiveTime(),
+        totalTimeSeconds: this.getTimeOnPage(),
+        maxScrollDepth: Math.round(this.maxScrollDepth),
+        pageTitle: document.title,
+        device: this.getDeviceType(),
+      },
+    });
     this.flushEvents(true);
     this.stopSessionRecording();
   }
@@ -598,6 +693,24 @@ class AnalyticsManager {
 
   public getActiveTime(): number {
     return this.activeTime;
+  }
+
+  /**
+   * Helper for external callers to manually flush engagement summary without destroying manager
+   */
+  public emitEngagementSnapshot(): void {
+    this.queueEvent({
+      eventType: 'custom',
+      eventName: 'engagement_snapshot',
+      pageURL: window.location.href,
+      metadata: {
+        activeTimeSeconds: this.getActiveTime(),
+        totalTimeSeconds: this.getTimeOnPage(),
+        maxScrollDepth: Math.round(this.maxScrollDepth),
+        pageTitle: document.title,
+        device: this.getDeviceType(),
+      },
+    });
   }
 }
 

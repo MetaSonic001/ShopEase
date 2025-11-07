@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_URL = ((import.meta as any).env?.VITE_API_BASE || (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000') + '/api';
+import api from './api';
 
 // Get dashboard overview
 export const getDashboardOverview = async (projectId?: string, from?: string, to?: string) => {
@@ -9,7 +7,7 @@ export const getDashboardOverview = async (projectId?: string, from?: string, to
   if (from) params.append('from', from);
   if (to) params.append('to', to);
 
-  const response = await axios.get(`${API_URL}/dashboard/overview?${params.toString()}`);
+  const response = await api.get(`/api/dashboard/overview?${params.toString()}`);
   return response.data;
 };
 
@@ -20,7 +18,7 @@ export const getPageAnalytics = async (pageURL: string, projectId?: string, from
   if (from) params.append('from', from);
   if (to) params.append('to', to);
 
-  const response = await axios.get(`${API_URL}/dashboard/page?${params.toString()}`);
+  const response = await api.get(`/api/dashboard/page?${params.toString()}`);
   return response.data;
 };
 
@@ -31,28 +29,28 @@ export const getUserFlow = async (projectId?: string, from?: string, to?: string
   if (from) params.append('from', from);
   if (to) params.append('to', to);
 
-  const response = await axios.get(`${API_URL}/dashboard/user-flow?${params.toString()}`);
+  const response = await api.get(`/api/dashboard/user-flow?${params.toString()}`);
   return response.data;
 };
 
 // Session management
 export const startSession = async (sessionData: any) => {
-  const response = await axios.post(`${API_URL}/sessions/start`, sessionData);
+  const response = await api.post(`/api/sessions/start`, sessionData);
   return response.data;
 };
 
 export const updateSession = async (sessionId: string, data: any) => {
-  const response = await axios.put(`${API_URL}/sessions/${sessionId}`, data);
+  const response = await api.put(`/api/sessions/${sessionId}`, data);
   return response.data;
 };
 
 export const endSession = async (sessionId: string) => {
-  const response = await axios.post(`${API_URL}/sessions/${sessionId}/end`);
+  const response = await api.post(`/api/sessions/${sessionId}/end`);
   return response.data;
 };
 
 export const getActiveSessions = async (projectId?: string) => {
   const params = projectId ? `?projectId=${projectId}` : '';
-  const response = await axios.get(`${API_URL}/sessions/active${params}`);
+  const response = await api.get(`/api/sessions/active${params}`);
   return response.data;
 };

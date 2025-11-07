@@ -302,6 +302,55 @@ router.delete('/sessions/:sessionId', async (req, res) => {
   }
 });
 
+// Get available pages with session data
+router.get('/sessions/pages/available', async (req, res) => {
+  try {
+    // Get distinct pages from sessions that have events
+    const pages = await SessionRecording.distinct('entryURL', {
+      events: { $exists: true, $ne: [] }
+    });
+
+    // Get session counts per page
+    const pagesWithCounts = await Promise.all(
+      pages.map(async (pageURL) => {
+        const count = await SessionRecording.countDocuments({
+          entryURL: pageURL,
+          events: { $exists: true, $ne: [] }
+        });
+        
+        // Get heatmap data counts
+        const heatmapCounts = await HeatmapData.aggregate([
+          { $match: { pageURL } },
+          { $group: { _id: '$type', count: { $sum: 1 } } }
+        ]);
+
+        const heatmapTypes = {};
+        heatmapCounts.forEach(item => {
+          heatmapTypes[item._id] = item.count;
+        });
+
+        return {
+          pageURL,
+          sessionCount: count,
+          heatmapTypes,
+          hasData: count > 0
+        };
+      })
+    );
+
+    // Sort by session count descending
+    pagesWithCounts.sort((a, b) => b.sessionCount - a.sessionCount);
+
+    res.json({
+      pages: pagesWithCounts,
+      total: pagesWithCounts.length
+    });
+  } catch (error) {
+    console.error('Error fetching available pages:', error);
+    res.status(500).json({ message: 'Failed to fetch available pages', error: error.message });
+  }
+});
+
 // ===== USER INTERACTION ENDPOINTS =====
 
 // Record single user interaction (click, scroll, hover, etc.)

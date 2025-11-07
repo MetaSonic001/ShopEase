@@ -73,6 +73,7 @@ export default function AdminDataManagement() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [seedingHeatmap, setSeedingHeatmap] = useState(false);
 
   // Product seeding dialog state
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
@@ -344,6 +345,29 @@ export default function AdminDataManagement() {
         ? prev.filter(c => c !== category)
         : [...prev, category]
     );
+  };
+
+  const handleSeedHeatmapData = async () => {
+    try {
+      setSeedingHeatmap(true);
+      const res = await axios.post(`${API_BASE}/api/seed/data/heatmap-data`);
+
+      toast({
+        title: 'Success',
+        description: 'Heatmap data seeded successfully! View in Sessions and Heatmap pages.',
+      });
+
+      await fetchSeedStats();
+    } catch (error: any) {
+      console.error('Error seeding heatmap data:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to seed heatmap data',
+        variant: 'destructive',
+      });
+    } finally {
+      setSeedingHeatmap(false);
+    }
   };
 
   const handleResetDatabase = async () => {
@@ -939,6 +963,19 @@ export default function AdminDataManagement() {
               <Button onClick={() => setSeedDialogOpen(true)} disabled={seeding} variant="default">
                 <Package className="mr-2 h-4 w-4" />
                 Seed Products
+              </Button>
+              <Button onClick={handleSeedHeatmapData} disabled={seedingHeatmap} variant="default">
+                {seedingHeatmap ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Seeding...
+                  </>
+                ) : (
+                  <>
+                    <MousePointer className="mr-2 h-4 w-4" />
+                    Seed Heatmap Data
+                  </>
+                )}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>

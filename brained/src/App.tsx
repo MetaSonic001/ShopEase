@@ -27,7 +27,8 @@ import { CartProvider } from "./context/CartContext";
 import RealTimeAnalyticsDashboard from "./pages/Admin/RealTimeAnalyticsDashboard";
 import RecordingsList from "./pages/Admin/RecordingsList";
 import SessionReplayPlayer from "./pages/Admin/SessionReplayPlayerNew";
-import HeatmapVisualization from "./pages/Admin/HeatmapVisualization";
+// Use improved Heatmap visualization component
+import HeatmapVisualizationImproved from "./pages/Admin/HeatmapVisualizationImproved";
 import PerformanceAnalytics from "./pages/Admin/PerformanceAnalyticsDashboard";
 import FunnelAnalysis from "./pages/Admin/FunnelAnalysis";
 import CohortAnalysis from "./pages/Admin/CohortAnalysis";
@@ -46,7 +47,6 @@ import { useAuth } from "./context/AuthContext";
 import Analytics2 from "./pages/Admin/Analytics2";
 import RealTimeAnalyticsDashboard2 from "./pages/Admin/RealTimeAnalyticsDashboards2";
 import FunnelAnalysis2 from "./pages/Admin/FunnelAnalysis2";
-import HeatmapVisualizationDynamic from "./pages/Admin/HeatmapVisualizationDynamic";
 import LiveRecordingDashboard from "./pages/Admin/LiveRecordingDashboard";
 import ReportsExport from "./pages/Admin/ReportsExport";
 import BehaviorAnalytics from "./pages/Admin/BehaviorAnalytics";
@@ -122,10 +122,9 @@ function App() {
     const trackingEnabled = localStorage.getItem('tracking_enabled') !== 'false';
     const hasOptedOut = localStorage.getItem('analytics_opt_out') === 'true';
 
-    // Only connect if user is not admin and tracking is enabled
-    if (isAdmin || !trackingEnabled || hasOptedOut) {
-      return;
-    }
+    // We'll connect only when admin starts a Live Recording session or when server instructs.
+    // For now, avoid connecting on admin routes to prevent immediate connect/disconnect noise.
+    if (isAdmin || !trackingEnabled || hasOptedOut || isAdminRoute) return;
 
     const socket = io(API_URL, {
       transports: ['websocket', 'polling'],
@@ -181,7 +180,10 @@ function App() {
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[App] WebSocket disconnected:', reason);
+      // Avoid logging the common, benign "io client disconnect" during normal navigation/unmount
+      if (reason !== 'io client disconnect') {
+        console.log('[App] WebSocket disconnected:', reason);
+      }
       
       // If recording was active and we got disconnected, flag it
       if (isRecordingActive && stopRecording) {
@@ -287,9 +289,10 @@ function App() {
         stopRecording();
       }
       isRecordingActive = false;
+      // Disconnect without logging (will emit 'io client disconnect')
       socket.disconnect();
     };
-  }, [auth?.user]);
+  }, [auth?.user, isAdminRoute]);
 
   // Track page views on route change (but not for admin routes or admin users)
   useEffect(() => {
@@ -347,8 +350,7 @@ function App() {
               <Route path="analytics/overview" element={<RealTimeAnalyticsDashboard />} />
               <Route path="analytics/recordings" element={<RecordingsList />} />
               <Route path="analytics/recordings/:sessionId" element={<SessionReplayPlayer />} />
-              <Route path="analytics/heatmap" element={<HeatmapVisualization />} />
-              <Route path="analytics/heatmap-dynamic" element={<HeatmapVisualizationDynamic />} />
+              <Route path="analytics/heatmap" element={<HeatmapVisualizationImproved />} />
               <Route path="analytics/live-recording" element={<LiveRecordingDashboard />} />
                           <Route path="analytics/reports" element={<ReportsExport />} />
               <Route path="analytics/behavior" element={<BehaviorAnalytics />} />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardOverview } from '../../services/dashboard';
+import { useAuth } from '../../context/AuthContext';
 import {
   LineChart,
   Line,
@@ -67,11 +68,15 @@ const Dashboard: React.FC = () => {
   const [dateRange, setDateRange] = useState('7d');
   const [error, setError] = useState('');
 
+  const { accessToken } = useAuth();
+
   useEffect(() => {
+    // Wait until we have an access token before attempting any dashboard calls to avoid 401 spam
+    if (!accessToken) return;
     loadDashboard();
     const interval = setInterval(loadDashboard, 30000); // Refresh every 30s
     return () => clearInterval(interval);
-  }, [dateRange]);
+  }, [dateRange, accessToken]);
 
   const loadDashboard = async () => {
     try {
@@ -131,6 +136,18 @@ const Dashboard: React.FC = () => {
       </div>
     </div>
   );
+
+  // If we don't yet have a token, show a unified loading state
+  if (!accessToken) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="text-sm text-gray-500">Establishing secure session…</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

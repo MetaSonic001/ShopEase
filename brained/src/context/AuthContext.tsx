@@ -6,6 +6,7 @@ type User = { id: string; name: string; email: string; role?: string } | null;
 type AuthContextType = {
   user: User;
   accessToken: string | null;
+  initialized: boolean; // true once initial refresh attempt has completed
   // return the user object on success so callers can react immediately (e.g. redirect)
   login: (email: string, password: string) => Promise<User | void>;
   register: (name: string, email: string, password: string, adminSecret?: string) => Promise<User | void>;
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState<boolean>(false);
 
   useEffect(() => {
     // attempt to refresh on mount to populate accessToken if refresh cookie exists
@@ -28,6 +30,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.data.user) setUser(res.data.user);
       } catch (e) {
         // no session
+      } finally {
+        setInitialized(true); // mark that we attempted refresh
       }
     })();
   }, []);
@@ -71,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, login, register, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, accessToken, initialized, login, register, logout }}>{children}</AuthContext.Provider>
   );
 };
 

@@ -17,7 +17,8 @@ app.use(cookieParser());
 
 // Support a comma-separated list of allowed client origins via CLIENT_URLS
 // Fallback to CLIENT_URL for single-value usage, then a default of localhost:3000
-const rawClientList = process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:3000';
+// Include common dev ports by default (3000 and 5173) so Vite/React dev servers work out of the box
+const rawClientList = process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:3000,http://localhost:5173';
 const CLIENT_ORIGINS = rawClientList.split(',').map((u) => u.trim()).filter(Boolean);
 
 // Optional: allow domain suffixes for preview environments (e.g., *.vercel.app)

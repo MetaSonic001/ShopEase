@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import analyticsManager from '../services/AnalyticsManager';
 import api from '../services/api';
+import { useAuth } from './AuthContext';
 
 export interface CartItem {
   id: string;
@@ -40,10 +41,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
   const [loading, setLoading] = useState(false);
+  const auth = useAuth();
 
   // Sync cart with backend when user logs in
   const syncCart = React.useCallback(async () => {
     try {
+      // Skip cart sync entirely for admin users
+      if (auth?.user?.role === 'admin') {
+        return;
+      }
       const token = localStorage.getItem('token');
       if (!token) {
         // No token, skip backend sync and just use local storage
@@ -78,17 +84,21 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error: any) {
       // Silently ignore 401 errors (user not authenticated)
-      if (error?.response?.status !== 401) {
+      if (error?.response?.status !== 401 && error?.response?.status !== 403) {
         console.error('Failed to sync cart:', error);
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [auth?.user?.role]);
 
   // Load cart from backend on mount if authenticated
   useEffect(() => {
     const token = localStorage.getItem('token');
+    if (auth?.user?.role === 'admin') {
+      // no-op for admin users
+      return;
+    }
     if (token) {
       syncCart();
     }
@@ -159,6 +169,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeItem: CartContextValue['removeItem'] = async (id) => {
     const token = localStorage.getItem('token');
+    if (auth?.user?.role === 'admin') {
+      // no-op for admin users
+      return;
+    }
     const item = items.find((i) => i.id === id);
     setItems((prev) => prev.filter((i) => i.id !== id));
 
@@ -181,6 +195,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateQuantity: CartContextValue['updateQuantity'] = async (id, quantity) => {
     const token = localStorage.getItem('token');
+    if (auth?.user?.role === 'admin') {
+      // no-op for admin users
+      return;
+    }
     const item = items.find((i) => i.id === id);
 
     if (quantity <= 0) {
@@ -212,6 +230,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clear = async () => {
     const token = localStorage.getItem('token');
+    if (auth?.user?.role === 'admin') {
+      // no-op for admin users
+      setItems([]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+      return;
+    }
 
     analyticsManager.trackCustomEvent('clear_cart', {
       itemCount: items.length,

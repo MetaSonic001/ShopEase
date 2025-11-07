@@ -11,6 +11,7 @@ const { seedConsentMaskingRules, clearSeededConsentMaskingRules } = require('../
 const { seedEnrichedUserEvents, clearSeededUserEvents } = require('../scripts/seedEnrichedEvents');
 const { seedEnrichedPerformanceMetrics, clearSeededPerformanceMetrics } = require('../scripts/seedEnrichedPerformance');
 const { seedEnrichedSessionRecordings, clearSeededSessionRecordings } = require('../scripts/seedEnrichedSessions');
+const { seedAllHeatmapData, clearSeededHeatmapData } = require('../scripts/seedHeatmapData');
 
 // Import models for seed status
 const AlertRule = require('../models/AlertRule');
@@ -379,6 +380,10 @@ router.post('/data/:type', async (req, res) => {
         result = await seedEnrichedSessionRecordings(count || 50);
         break;
       
+        case 'heatmap-data':
+          result = await seedAllHeatmapData();
+          break;
+      
       default:
         return res.status(400).json({ error: `Unknown seed type: ${type}` });
     }
@@ -429,6 +434,10 @@ router.delete('/data/:type', async (req, res) => {
       case 'products':
         result = await Product.deleteMany({ seededId: { $regex: /^SEED-/ } });
         break;
+      
+        case 'heatmap-data':
+          result = await clearSeededHeatmapData();
+          break;
       
       default:
         return res.status(400).json({ error: `Unknown seed type: ${type}` });

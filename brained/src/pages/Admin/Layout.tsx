@@ -118,11 +118,11 @@ const AdminLayout: React.FC = () => {
       url: '/admin/analytics/overview',
       icon: TrendingUp,
     },
-    {
-      title: 'Real-Time Dashboard',
-      url: '/admin/analytics/realtime',
-      icon: Activity,
-    },
+    // {
+    //   title: 'Real-Time Dashboard',
+    //   url: '/admin/analytics/realtime',
+    //   icon: Activity,
+    // },
     {
       title: 'Session Recordings',
       url: '/admin/analytics/recordings',
