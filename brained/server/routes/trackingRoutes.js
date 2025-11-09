@@ -907,7 +907,7 @@ router.get('/heatmap', async (req, res) => {
 
     // Check if this is a pattern match (e.g., /products/* for all product pages)
     const isPattern = pattern === 'true' || pageURL.includes('*') || pageURL.includes(':id');
-    
+
     // Normalize pageURL for pattern matching
     let urlPattern = pageURL;
     if (isPattern) {

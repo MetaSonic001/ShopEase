@@ -134,7 +134,7 @@ function App() {
       reconnectionAttempts: 10,
       timeout: 10000,
     });
-    
+
     let stopRecording: any = null;
     let isRecordingActive = false;
     let eventBatchBuffer: any[] = [];
@@ -144,15 +144,15 @@ function App() {
     const flushEventBatch = () => {
       if (eventBatchBuffer.length > 0 && socket.connected) {
         console.log(`[App] Flushing ${eventBatchBuffer.length} buffered events`);
-        
+
         // Emit all buffered events in one message
         eventBatchBuffer.forEach((data) => {
           socket.emit('recording-event', data);
         });
-        
+
         eventBatchBuffer = [];
       }
-      
+
       batchTimeoutId = null;
     };
 
@@ -184,7 +184,7 @@ function App() {
       if (reason !== 'io client disconnect') {
         console.log('[App] WebSocket disconnected:', reason);
       }
-      
+
       // If recording was active and we got disconnected, flag it
       if (isRecordingActive && stopRecording) {
         console.log('[App] Disconnected during recording, will attempt reconnect...');
@@ -204,7 +204,7 @@ function App() {
     socket.on('recording-start', ({ recordingId }) => {
       console.log('[App] Starting recording:', recordingId);
       isRecordingActive = true;
-      
+
       stopRecording = record({
         emit(event) {
           if (socket.connected) {
@@ -218,15 +218,15 @@ function App() {
                 userId: auth?.user?.id || 'anonymous',
               },
             };
-            
+
             // Add to batch buffer
             eventBatchBuffer.push(eventData);
-            
+
             // Schedule flush if not already scheduled
             if (!batchTimeoutId) {
               batchTimeoutId = setTimeout(flushEventBatch, 400); // Flush every 400ms
             }
-            
+
             // Also flush immediately if buffer gets too large (safety)
             if (eventBatchBuffer.length >= 50) {
               if (batchTimeoutId) {
@@ -265,13 +265,13 @@ function App() {
     socket.on('recording-stop', () => {
       console.log('[App] Stopping recording');
       isRecordingActive = false;
-      
+
       // Flush any remaining events before stopping
       if (batchTimeoutId) {
         clearTimeout(batchTimeoutId);
       }
       flushEventBatch();
-      
+
       if (stopRecording) {
         stopRecording();
         stopRecording = null;
@@ -284,7 +284,7 @@ function App() {
         clearTimeout(batchTimeoutId);
       }
       flushEventBatch();
-      
+
       if (stopRecording) {
         stopRecording();
       }
@@ -352,7 +352,7 @@ function App() {
               <Route path="analytics/recordings/:sessionId" element={<SessionReplayPlayer />} />
               <Route path="analytics/heatmap" element={<HeatmapAnalytics />} />
               <Route path="analytics/live-recording" element={<LiveRecordingDashboard />} />
-                          <Route path="analytics/reports" element={<ReportsExport />} />
+              <Route path="analytics/reports" element={<ReportsExport />} />
               <Route path="analytics/behavior" element={<BehaviorAnalytics />} />
               <Route path="analytics/quality" element={<RageDeadClicks />} />
               <Route path="analytics/errors" element={<ErrorGroups />} />

@@ -74,7 +74,7 @@ heatmapDataSchema.statics.generateHeatmap = async function (
   device = null
 ) {
   const UserInteraction = mongoose.model('UserInteraction');
-  
+
   const matchQuery = {
     pageURL,
     eventType: type,
@@ -138,10 +138,10 @@ heatmapDataSchema.statics.generatePatternHeatmap = async function (
   device = null
 ) {
   const UserInteraction = mongoose.model('UserInteraction');
-  
+
   // Convert the pattern to a regex
   const regex = new RegExp('^' + urlPattern + '$', 'i');
-  
+
   const matchQuery = {
     pageURL: { $regex: regex },
     eventType: type,
