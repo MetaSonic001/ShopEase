@@ -174,7 +174,9 @@ Instead of paying for multiple SaaS tools and sending your data to third parties
 │  ✓ User properties and super properties                 │
 │  ✓ Real-time dashboards                                 │
 │  ✓ Event segmentation and filtering                     │
-│  ✓ CSV/PDF exports                                      │
+│  ✓ CSV/PDF exports with email delivery                  │
+│  ✓ Multi-dataset CSV grouping (vitals, devices, errors) │
+│  ✓ SMTP-based report distribution                       │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -231,6 +233,8 @@ Instead of paying for multiple SaaS tools and sending your data to third parties
 │  ✓ JavaScript error capture                             │
 │  ✓ Network request logging                              │
 │  ✓ Device and browser breakdown                         │
+│  ✓ Performance reports via email (PDF + CSV)            │
+│  ✓ Percentile analysis (P50, P75, P95)                  │
 └─────────────────────────────────────────────────────────┘
 
 ### 🛎️ Alerting & Automation
@@ -351,7 +355,162 @@ Instead of paying for multiple SaaS tools and sending your data to third parties
 
 ---
 
-## 🚀 Quick Start
+## � Export & Reporting System
+
+PagePulse includes a comprehensive export and reporting system that allows you to share analytics data via multiple formats:
+
+### 📊 Export Formats
+
+**PDF Export**
+- Full-page dashboard capture with all charts and metrics
+- Optimized for print and email distribution
+- Automatically handles modern CSS (OKLCH color conversion)
+- Multi-page support for tall dashboards
+- A4 format standardization
+
+**CSV Export**
+- Multiple dataset groups in a single export
+- Separate files for different data categories:
+  - Core Web Vitals summary with ratings
+  - Detailed performance metrics per page
+  - JavaScript errors with device info
+  - Device performance breakdown
+  - API performance stats
+- Properly quoted fields (handles commas, quotes, newlines)
+- Timestamp normalization (ISO 8601)
+
+### 📧 Email Delivery
+
+Send analytics reports directly to stakeholders via email:
+
+**Features:**
+- SMTP-based email delivery with attachments
+- PDF and CSV attachments in a single email
+- Beautiful HTML email template with branding
+- Multiple recipient support
+- Report metadata (generation time, data range)
+- Automatic file naming with date ranges
+
+**How to Use:**
+1. Navigate to any analytics dashboard (Performance, Heatmaps, Trends, etc.)
+2. Click the **Share** button in the toolbar
+3. Select **Email Report** from the dropdown
+4. Enter recipient email address(es)
+5. Click **Send Report**
+6. Recipient receives email with PDF and CSV attachments
+
+**Supported Dashboards:**
+- ✅ Performance Analytics (Core Web Vitals)
+- ✅ Performance Analytics Dashboard (Detailed)
+- ✅ Real-Time Analytics
+- ✅ Heatmap Visualization
+- ✅ Path Analysis
+- ✅ Trends Dashboard
+- ✅ Insights Dashboard
+- ✅ Alert Rules Manager
+
+### 🔧 Export Toolbar Component
+
+All analytics pages use a unified `ExportToolbar` component that provides:
+
+```typescript
+<ExportToolbar
+  targetRef={contentRef}              // Element to capture for PDF
+  pdfFilename="report-name.pdf"       // Custom PDF filename
+  csvGroups={csvDataGroups}           // Array of CSV datasets
+  shareUrl={window.location.href}     // URL for share link
+  size="sm"                           // Button size variant
+/>
+```
+
+**CSV Group Structure:**
+```typescript
+{
+  label: "Core Web Vitals",           // Display name in dropdown
+  headers: ["Metric", "Value", ...],  // CSV column headers
+  rows: [["TTFB", "120ms", ...], ...], // Data rows
+  filename: "vitals-report.csv"       // Download filename
+}
+```
+
+### 🎨 PDF Generation Technical Details
+
+**Color Handling:**
+- Automatically converts modern CSS colors (OKLCH, OKLAB) to RGB
+- Ensures compatibility with html2canvas
+- Preserves visual fidelity across different color spaces
+
+**Compression:**
+- JPEG format with 80% quality (vs PNG for smaller files)
+- Scale optimization (1.5x vs 2x for reduced file size)
+- Result: 60-70% file size reduction
+
+**Size Limits:**
+- Server configured for 100MB payload limit
+- Typical PDF size: 1-3MB after optimization
+- Large dashboards automatically paginated
+
+### 📨 Email Service Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Frontend (React)                                       │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ 1. Capture dashboard → canvas (OKLCH → RGB)      │ │
+│  │ 2. Generate PDF (jsPDF)                           │ │
+│  │ 3. Convert to base64                              │ │
+│  │ 4. Prepare CSV data                               │ │
+│  └────────────────────┬──────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                         │
+                         ▼ POST /api/reports/send-now
+┌─────────────────────────────────────────────────────────┐
+│  Backend API (Express)                                  │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ 1. Receive base64 PDF + CSV data                  │ │
+│  │ 2. Convert base64 → Buffer                        │ │
+│  │ 3. Create email with attachments                  │ │
+│  │ 4. Send via SMTP (nodemailer)                     │ │
+│  └───────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  Email Service (nodemailer)                             │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ • HTML email template with branding               │ │
+│  │ • PDF attachment (dashboard capture)              │ │
+│  │ • CSV attachment(s) (data exports)                │ │
+│  │ • Report metadata (date, recipients)              │ │
+│  └───────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 📊 Use Cases
+
+**Performance Reports:**
+- Weekly Core Web Vitals summaries to stakeholders
+- P75/P95 performance degradation alerts
+- Device-specific performance breakdowns
+
+**Error Reports:**
+- JavaScript error summaries to development team
+- Co-occurrence analysis (errors + rage clicks)
+- Device and browser error distributions
+
+**Business Metrics:**
+- Funnel conversion rates to product managers
+- A/B test results to marketing team
+- User cohort analysis to executives
+
+**Compliance & Auditing:**
+- Scheduled reports for regulatory compliance
+- Historical data exports for audits
+- Privacy-safe aggregated analytics
+
+---
+
+## �🚀 Quick Start
 
 ### Prerequisites
 
