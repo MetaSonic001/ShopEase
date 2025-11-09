@@ -70,7 +70,7 @@ const LiveRecordingDashboard: React.FC = () => {
   const [liveDelayMs, setLiveDelayMs] = useState<number>(1200);
   const [selectedUserId, setSelectedUserId] = useState<UserId | 'all'>('all');
   const [userIds, setUserIds] = useState<UserId[]>([]);
-  
+
   const socketRef = useRef<Socket | null>(null);
   const replayerRef = useRef<Replayer | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -86,12 +86,12 @@ const LiveRecordingDashboard: React.FC = () => {
         const response = await api.get('/api/tracking/recording-status');
         if (response.data.isRecording) {
           console.log('[LiveRecording] Found active recording:', response.data.recordingId);
-          
+
           // Ask user if they want to resume
           const resume = window.confirm(
             `There's an active recording in progress. Would you like to resume viewing it?`
           );
-          
+
           if (resume) {
             setRecordingId(response.data.recordingId);
             setIsRecording(true);
@@ -124,7 +124,7 @@ const LiveRecordingDashboard: React.FC = () => {
       setIsConnected(true);
       setIsReconnecting(false);
       setError(null);
-      
+
       // Join admin room for live recording
       socket.emit('join-admin-room', { adminId: 'admin-user' });
 
@@ -143,7 +143,7 @@ const LiveRecordingDashboard: React.FC = () => {
     socket.on('disconnect', (reason) => {
       console.log('[LiveRecording] Disconnected from WebSocket:', reason);
       setIsConnected(false);
-      
+
       // Show reconnecting status unless manually disconnected
       if (reason !== 'io client disconnect') {
         setIsReconnecting(true);
@@ -178,7 +178,7 @@ const LiveRecordingDashboard: React.FC = () => {
     socket.on('live-event', (data: { recordingId: string; event: any; metadata?: any }) => {
       if (data.recordingId === recordingId) {
         console.log('[LiveRecording] Received live event:', data.event.type);
-        
+
         // Unpack if string
         let event = data.event as any;
         if (typeof event === 'string') {
@@ -191,7 +191,7 @@ const LiveRecordingDashboard: React.FC = () => {
         }
         const eventUserId: UserId = data?.metadata?.userId || 'anonymous';
         const enrichedEvent: LiveEventEx = { ...(event as LiveEvent), __userId: eventUserId };
-        
+
         // Track user ids and metadata
         setUserIds((prev) => (prev.includes(eventUserId) ? prev : [...prev, eventUserId]));
         if (data.metadata) {
@@ -205,7 +205,7 @@ const LiveRecordingDashboard: React.FC = () => {
             : userMetadataMapRef.current.get(selectedUserId) || data.metadata;
           setMetadata((prev) => ({ ...prev, ...selectedMeta }));
         }
-        
+
         // Push into master list
         allEventsRef.current.push(enrichedEvent);
 
@@ -235,14 +235,16 @@ const LiveRecordingDashboard: React.FC = () => {
         );
         setEventStats(stats);
 
-        // Throttle replayer updates
+        // Throttle replayer updates using requestAnimationFrame for better performance
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
         }
         updateTimeoutRef.current = window.setTimeout(() => {
-          setLiveEvents(visible);
-          updateReplayer(visible);
-        }, 500);
+          requestAnimationFrame(() => {
+            setLiveEvents(visible);
+            updateReplayer(visible);
+          });
+        }, 300); // Reduced from 500ms to 300ms for smoother updates
       }
     });
 
@@ -294,6 +296,10 @@ const LiveRecordingDashboard: React.FC = () => {
         showWarning: false,
         showDebug: false,
         liveMode: true, // Important for live streaming
+        UNSAFE_replayCanvas: true,
+        insertStyleRules: [
+          'iframe { background: white; }',
+        ],
         mouseTail: {
           duration: 500,
           lineCap: 'round',
@@ -308,10 +314,16 @@ const LiveRecordingDashboard: React.FC = () => {
 
       replayerRef.current = replayer;
 
-      // Apply scaling
-      setTimeout(() => {
+      // Apply scaling and fix iframe sandbox - use requestAnimationFrame instead of setTimeout
+      requestAnimationFrame(() => {
         applyReplayerScaling();
-      }, 100);
+
+        // Fix iframe sandbox permissions
+        const iframe = playerContainerRef.current?.querySelector('iframe') as HTMLIFrameElement;
+        if (iframe) {
+          iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        }
+      });
     } catch (err) {
       console.error('[LiveRecording] Error updating replayer:', err);
     }
@@ -384,8 +396,19 @@ const LiveRecordingDashboard: React.FC = () => {
       // Save recording to database
       try {
         const duration = Date.now() - recordingStartTimeRef.current;
+
+        // Validate we have events to save
+        if (allEventsRef.current.length === 0) {
+          console.warn('[LiveRecording] No events captured during recording');
+          alert('Recording stopped, but no events were captured. Make sure users visited pages during the recording.');
+          setRecordingId(null);
+          return;
+        }
+
+        console.log(`[LiveRecording] Saving ${allEventsRef.current.length} events...`);
+
         // Save full event set (not just filtered view)
-        await api.post('/api/tracking/save-recording', {
+        const response = await api.post('/api/tracking/save-recording', {
           sessionId: recordingId,
           projectId: 'default',
           events: allEventsRef.current,
@@ -399,11 +422,13 @@ const LiveRecordingDashboard: React.FC = () => {
           duration,
         });
 
-        console.log('[LiveRecording] Recording saved successfully');
-        alert(`Recording saved! ${liveEvents.length} events captured over ${Math.round(duration / 1000)}s`);
+        console.log('[LiveRecording] Recording saved successfully:', response.data);
+        alert(`Recording saved! ${allEventsRef.current.length} events captured over ${Math.round(duration / 1000)}s`);
       } catch (err: any) {
         console.error('[LiveRecording] Failed to save recording:', err);
-        alert('Failed to save recording: ' + (err.response?.data?.message || err.message));
+        const errorMessage = err.response?.data?.message || err.message || 'Unknown error';
+        const errorDetails = err.response?.data?.error || '';
+        alert(`Failed to save recording: ${errorMessage}${errorDetails ? '\n' + errorDetails : ''}`);
       }
     }
 
@@ -511,8 +536,8 @@ const LiveRecordingDashboard: React.FC = () => {
               <Badge variant="outline" className="flex items-center space-x-1.5">
                 <Users className="w-4 h-4" />
                 <span>
-                  {activeUsers > 0 
-                    ? `${activeUsers} active user${activeUsers !== 1 ? 's' : ''}` 
+                  {activeUsers > 0
+                    ? `${activeUsers} active user${activeUsers !== 1 ? 's' : ''}`
                     : 'No active users'}
                 </span>
               </Badge>
@@ -765,13 +790,12 @@ const LiveRecordingDashboard: React.FC = () => {
                             className="flex items-start space-x-3 text-xs p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border border-gray-100 dark:border-gray-800"
                           >
                             <div
-                              className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                event.type === 2
+                              className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${event.type === 2
                                   ? 'bg-green-500'
                                   : event.type === 3
-                                  ? 'bg-blue-500'
-                                  : 'bg-gray-400'
-                              }`}
+                                    ? 'bg-blue-500'
+                                    : 'bg-gray-400'
+                                }`}
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-1">

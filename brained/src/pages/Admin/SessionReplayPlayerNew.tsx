@@ -33,12 +33,12 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -72,11 +72,11 @@ interface SessionData {
 const SessionReplayPlayerNew: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  
+
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Player state
   const [replayer, setReplayer] = useState<Replayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -85,22 +85,25 @@ const SessionReplayPlayerNew: React.FC = () => {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [skipInactive, setSkipInactive] = useState(true);
-  
+  const [skipInactive, setSkipInactive] = useState(false); // Disabled for smoother playback
+  const [autoplay, setAutoplay] = useState(true); // Enable autoplay by default
+
   // Event tracking
   const [eventCounts, setEventCounts] = useState<Record<string, number>>({});
   const [currentEvent, setCurrentEvent] = useState<any>(null);
-  
+
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const progressIntervalRef = useRef<number | null>(null);
   const isInitializedRef = useRef<boolean>(false);
+  const startTimestampRef = useRef<number>(0); // Store the first event timestamp
+  const animationFrameRef = useRef<number | null>(null); // For smooth progress updates
 
   useEffect(() => {
     if (sessionId) {
       fetchSessionData();
     }
-    
+
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
@@ -114,13 +117,13 @@ const SessionReplayPlayerNew: React.FC = () => {
       setLoading(true);
       const response = await api.get(`/api/tracking/sessions/${sessionId}`);
       const data = response.data.session || response.data; // Handle both formats
-      
+
       console.log('[SessionReplayPlayer] Fetched session:', {
         sessionId: data.sessionId,
         eventCount: data.events?.length || 0,
         hasMetadata: !!data.metadata,
       });
-      
+
       setSessionData(data);
       setError(null);
     } catch (err: any) {
@@ -140,7 +143,7 @@ const SessionReplayPlayerNew: React.FC = () => {
       hasContainer: !!playerContainerRef.current,
       isInitialized: isInitializedRef.current
     });
-    
+
     if (!sessionData || !sessionData.events || sessionData.events.length === 0) {
       console.log('[SessionReplayPlayer] No session data or events');
       return;
@@ -156,7 +159,7 @@ const SessionReplayPlayerNew: React.FC = () => {
       console.log('[SessionReplayPlayer] Already initialized, skipping');
       return;
     }
-    
+
     console.log('[SessionReplayPlayer] Starting initialization...');
     isInitializedRef.current = true;
 
@@ -166,39 +169,60 @@ const SessionReplayPlayerNew: React.FC = () => {
       // 1. Packed strings (new format) - compressed event chunks
       // 2. Packed objects {v, e} (old packed format)
       // 3. Unpacked objects {type, timestamp, data} (original format)
-      
+
       let allEvents: any[] = [];
-      
+
       sessionData.events.forEach((event: any, index: number) => {
         if (typeof event === 'string') {
-          // New format: packed string - unpack it
-          console.log(`[SessionReplayPlayer] Unpacking event ${index + 1}/${sessionData.events.length}, length: ${event.length}`);
+          // Try to parse as JSON first (most common format from seed data)
+          console.log(`[SessionReplayPlayer] Processing event ${index + 1}/${sessionData.events.length}, type: string, length: ${event.length}`);
           try {
-            const unpacked = unpack(event);
-            console.log(`[SessionReplayPlayer] Unpacked type:`, typeof unpacked, Array.isArray(unpacked));
-            
-            // unpack() returns an object with numeric keys and a 'v' version property
-            // e.g., {0: event1, 1: event2, 2: event3, v: 'v1'}
-            // We need to convert this to an array
-            if (unpacked && typeof unpacked === 'object' && !Array.isArray(unpacked)) {
-              // Extract numeric keys and convert to array
-              const unpackedAny = unpacked as any;
-              const events = Object.keys(unpackedAny)
-                .filter(key => !isNaN(Number(key))) // Only numeric keys
-                .map(key => unpackedAny[key])
-                .filter(e => e && typeof e === 'object'); // Filter out any nulls
-              
-              console.log(`[SessionReplayPlayer] Extracted ${events.length} events from packed object`);
-              allEvents.push(...events);
-            } else if (Array.isArray(unpacked)) {
-              allEvents.push(...unpacked);
-            } else if (unpacked && typeof unpacked === 'object') {
-              allEvents.push(unpacked);
+            const parsed = JSON.parse(event);
+            console.log(`[SessionReplayPlayer] Successfully parsed JSON, type:`, Array.isArray(parsed) ? 'array' : typeof parsed);
+
+            if (Array.isArray(parsed)) {
+              console.log(`[SessionReplayPlayer] Parsed JSON array with ${parsed.length} events`);
+              allEvents.push(...parsed);
+            } else if (parsed && typeof parsed === 'object' && parsed.type !== undefined) {
+              // Single event object
+              console.log(`[SessionReplayPlayer] Parsed single event object`);
+              allEvents.push(parsed);
             }
-          } catch (err) {
-            console.error('[SessionReplayPlayer] Failed to unpack string event:', err);
-            console.error('[SessionReplayPlayer] Event preview:', event.substring(0, 200));
+            return; // Successfully parsed as JSON, skip unpacking
+          } catch (jsonErr: any) {
+            // Not JSON, try unpacking as compressed data
+            console.log(`[SessionReplayPlayer] JSON parse failed: ${jsonErr.message}, trying to unpack as compressed data`);
+            try {
+              const unpacked = unpack(event);
+              console.log(`[SessionReplayPlayer] Unpacked type:`, typeof unpacked, Array.isArray(unpacked));
+
+              // unpack() returns an object with numeric keys and a 'v' version property
+              // e.g., {0: event1, 1: event2, 2: event3, v: 'v1'}
+              // We need to convert this to an array
+              if (unpacked && typeof unpacked === 'object' && !Array.isArray(unpacked)) {
+                // Extract numeric keys and convert to array
+                const unpackedAny = unpacked as any;
+                const events = Object.keys(unpackedAny)
+                  .filter(key => !isNaN(Number(key))) // Only numeric keys
+                  .map(key => unpackedAny[key])
+                  .filter(e => e && typeof e === 'object'); // Filter out any nulls
+
+                console.log(`[SessionReplayPlayer] Extracted ${events.length} events from packed object`);
+                allEvents.push(...events);
+              } else if (Array.isArray(unpacked)) {
+                allEvents.push(...unpacked);
+              } else if (unpacked && typeof unpacked === 'object') {
+                allEvents.push(unpacked);
+              }
+            } catch (err: any) {
+              console.error('[SessionReplayPlayer] Failed to unpack string event:', err.message);
+              console.error('[SessionReplayPlayer] Event preview:', event.substring(0, 200));
+            }
           }
+        } else if (Array.isArray(event)) {
+          // Array of events
+          console.log(`[SessionReplayPlayer] Processing event array with ${event.length} events`);
+          allEvents.push(...event);
         } else if (event.v && typeof event === 'object' && !Array.isArray(event)) {
           // Old packed format: {0: event1, 1: event2, v: 'v1'} object
           const events = Object.keys(event)
@@ -245,10 +269,13 @@ const SessionReplayPlayerNew: React.FC = () => {
       const replayerInstance = new Replayer(sortedEvents, {
         root: playerContainerRef.current,
         speed: playbackSpeed,
-        skipInactive: skipInactive,
-        showWarning: true,
-        showDebug: import.meta.env.DEV,
+        skipInactive: false, // Disabled for smoother continuous playback
+        showWarning: false, // Disable warnings in production
+        showDebug: false, // Disable debug logs
         blockClass: 'rr-block',
+        liveMode: false, // Not live mode for recorded sessions
+        triggerFocus: false, // Prevent focus stealing
+        UNSAFE_replayCanvas: true, // Enable canvas replay
         mouseTail: {
           duration: 500,
           lineCap: 'round',
@@ -259,6 +286,10 @@ const SessionReplayPlayerNew: React.FC = () => {
           getReplayConsolePlugin(),
         ],
         unpackFn: unpack,
+        // CORS and iframe configuration
+        insertStyleRules: [
+          'iframe { pointer-events: none; }',
+        ],
       });
 
       // Set up event listeners
@@ -292,6 +323,11 @@ const SessionReplayPlayerNew: React.FC = () => {
 
       replayerInstance.on('event-cast', (event: any) => {
         setCurrentEvent(event);
+        // Update current time based on the event being played
+        if (event && event.timestamp) {
+          const relativeTime = Math.max(0, Math.min(event.timestamp - firstTimestamp, durationMs));
+          setCurrentTime(relativeTime);
+        }
       });
 
       replayerInstance.on('resize', (event: any) => {
@@ -303,38 +339,91 @@ const SessionReplayPlayerNew: React.FC = () => {
       const lastTimestamp = sortedEvents[sortedEvents.length - 1].timestamp;
       const durationMs = lastTimestamp - firstTimestamp;
       setDuration(durationMs);
+      startTimestampRef.current = firstTimestamp; // Store for relative time calculations
 
-      // Set up progress tracking
-      progressIntervalRef.current = window.setInterval(() => {
+      console.log('[SessionReplayPlayer] Duration calculated:', {
+        firstTimestamp,
+        lastTimestamp,
+        durationMs,
+        durationFormatted: formatTime(durationMs)
+      });
+
+      // Set up progress tracking with both event-cast and RAF for smooth updates
+      // Primary: event-cast updates (triggered by rrweb during playback)
+      // Fallback: RAF for cases where getCurrentTime works
+      const updateProgress = () => {
         if (replayerInstance && typeof replayerInstance.getCurrentTime === 'function') {
-          const time = replayerInstance.getCurrentTime();
-          setCurrentTime(time);
+          try {
+            const absoluteTime = replayerInstance.getCurrentTime();
+            const relativeTime = Math.max(0, Math.min(absoluteTime - startTimestampRef.current, durationMs));
+            setCurrentTime(relativeTime);
+          } catch (e) {
+            // Ignore errors
+          }
         }
-      }, 100);
+        animationFrameRef.current = requestAnimationFrame(updateProgress);
+      };
+
+      // Start the RAF loop as fallback
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
 
       setReplayer(replayerInstance);
       console.log('[SessionReplayPlayer] Replayer initialized successfully');
+
+      // Autoplay the recording after a short delay
+      setTimeout(() => {
+        if (autoplay) {
+          console.log('[SessionReplayPlayer] Starting autoplay...');
+          replayerInstance.play();
+          setIsPlaying(true);
+        }
+      }, 500);
+
+      // Fix iframe sandbox to allow scripts (needed for proper replay)
+      setTimeout(() => {
+        const iframe = playerContainerRef.current?.querySelector('iframe');
+        if (iframe) {
+          // Add allow-scripts to sandbox to prevent the console warning
+          const currentSandbox = iframe.getAttribute('sandbox') || '';
+          if (!currentSandbox.includes('allow-scripts')) {
+            iframe.setAttribute('sandbox', `${currentSandbox} allow-scripts allow-same-origin`.trim());
+            console.log('[SessionReplayPlayer] Fixed iframe sandbox attributes');
+          }
+
+          // Add styles to hide console overlay if it appears
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const style = iframeDoc.createElement('style');
+            style.textContent = `
+              /* Hide any console overlays that might appear */
+              .rr-console-log { display: none !important; }
+              .rr-console { display: none !important; }
+            `;
+            iframeDoc.head?.appendChild(style);
+          }
+        }
+      }, 100);
 
       // Apply styling to constrain and scale rrweb content within the frame
       const applyScaling = () => {
         if (playerContainerRef.current) {
           const wrapper = playerContainerRef.current.querySelector('.replayer-wrapper');
           const iframe = playerContainerRef.current.querySelector('.replayer-wrapper iframe');
-          
+
           if (wrapper instanceof HTMLElement && iframe instanceof HTMLElement) {
             const container = playerContainerRef.current;
             const containerWidth = container.clientWidth;
             const containerHeight = container.clientHeight;
-            
+
             // Get the iframe's natural dimensions
             const iframeWidth = parseInt(iframe.getAttribute('width') || '1024');
             const iframeHeight = parseInt(iframe.getAttribute('height') || '963');
-            
+
             // Calculate scale to fit and fill the container
             const scaleX = containerWidth / iframeWidth;
             const scaleY = containerHeight / iframeHeight;
             const scale = Math.min(scaleX, scaleY); // Fit to container
-            
+
             console.log('[SessionReplayPlayer] Scaling replayer:', {
               containerWidth,
               containerHeight,
@@ -344,7 +433,7 @@ const SessionReplayPlayerNew: React.FC = () => {
               scaleY,
               finalScale: scale
             });
-            
+
             // Apply transform to center and scale the wrapper
             wrapper.style.transform = `translate(-50%, -50%) scale(${scale})`;
             wrapper.style.transformOrigin = 'center center';
@@ -355,15 +444,18 @@ const SessionReplayPlayerNew: React.FC = () => {
       };
 
       setTimeout(applyScaling, 100);
-      
+
       // Reapply scaling on window resize
       window.addEventListener('resize', applyScaling);
 
-      // Cleanup function - only clear interval, don't destroy replayer
-      // The replayer will be cleaned up when the component unmounts (separate effect)
+      // Cleanup function - cancel animation frame and clear interval
       return () => {
-        console.log('[SessionReplayPlayer] Cleaning up interval');
+        console.log('[SessionReplayPlayer] Cleaning up animation frame and interval');
         window.removeEventListener('resize', applyScaling);
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
           progressIntervalRef.current = null;
@@ -386,6 +478,9 @@ const SessionReplayPlayerNew: React.FC = () => {
         } catch (e) {
           console.error('[SessionReplayPlayer] Error destroying replayer:', e);
         }
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
@@ -414,7 +509,10 @@ const SessionReplayPlayerNew: React.FC = () => {
       replayer.pause();
       setIsPlaying(false);
     } else {
-      replayer.play(currentTime);
+      // Convert relative time to absolute timestamp for rrweb
+      const playTime = currentTime >= duration ? 0 : currentTime;
+      const absoluteTime = startTimestampRef.current + playTime;
+      replayer.play(absoluteTime);
       setIsPlaying(true);
     }
   };
@@ -422,39 +520,43 @@ const SessionReplayPlayerNew: React.FC = () => {
   const handleSkipForward = () => {
     if (!replayer) return;
     const newTime = Math.min(currentTime + 5000, duration);
+    const absoluteTime = startTimestampRef.current + newTime;
     setCurrentTime(newTime);
     if (isPlaying) {
-      replayer.play(newTime);
+      replayer.play(absoluteTime);
     } else {
-      replayer.pause(newTime);
+      replayer.pause(absoluteTime);
     }
   };
 
   const handleSkipBack = () => {
     if (!replayer) return;
     const newTime = Math.max(currentTime - 5000, 0);
+    const absoluteTime = startTimestampRef.current + newTime;
     setCurrentTime(newTime);
     if (isPlaying) {
-      replayer.play(newTime);
+      replayer.play(absoluteTime);
     } else {
-      replayer.pause(newTime);
+      replayer.pause(absoluteTime);
     }
   };
 
   const handleSeek = (value: number[]) => {
     if (!replayer) return;
-    const newTime = value[0];
+    const newTime = Math.max(0, Math.min(value[0], duration));
+    const absoluteTime = startTimestampRef.current + newTime;
     setCurrentTime(newTime);
     if (isPlaying) {
-      replayer.play(newTime);
+      replayer.play(absoluteTime);
     } else {
-      replayer.pause(newTime);
+      replayer.pause(absoluteTime);
     }
   };
 
   const handleRestart = () => {
     if (!replayer) return;
-    replayer.pause(0);
+    const absoluteTime = startTimestampRef.current;
+    replayer.pause(absoluteTime);
     setCurrentTime(0);
     setIsPlaying(false);
   };
@@ -626,7 +728,7 @@ const SessionReplayPlayerNew: React.FC = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Overlay Info Badge */}
                   {replayer && (
                     <div className="absolute top-4 left-4 z-10">
@@ -851,17 +953,45 @@ const SessionReplayPlayerNew: React.FC = () => {
                     <ScrollArea className="h-[600px]">
                       {sessionData.consoleLogs && sessionData.consoleLogs.length > 0 ? (
                         <div className="space-y-2">
-                          {sessionData.consoleLogs.map((log: any, index: number) => (
-                            <div key={index} className="flex items-start space-x-3 text-xs p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0">
-                              {getLogIcon(log.level)}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">
-                                  {new Date(log.timestamp).toLocaleTimeString()}
-                                </p>
-                                <p className="font-mono text-sm break-words">{log.message}</p>
+                          {sessionData.consoleLogs
+                            .filter((log: any) => {
+                              // Filter out internal app logs to reduce noise
+                              const message = log.message || '';
+                              const isInternalLog =
+                                message.includes('[App]') ||
+                                message.includes('[SessionReplayPlayer]') ||
+                                message.includes('Performance metrics sent') ||
+                                message.includes('Flushing') ||
+                                message.includes('buffered events');
+                              return !isInternalLog;
+                            })
+                            .map((log: any, index: number) => (
+                              <div key={index} className="flex items-start space-x-3 text-xs p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0">
+                                {getLogIcon(log.level)}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">
+                                    {new Date(log.timestamp).toLocaleTimeString()}
+                                  </p>
+                                  <p className="font-mono text-sm break-words">{log.message}</p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          {sessionData.consoleLogs.filter((log: any) => {
+                            const message = log.message || '';
+                            const isInternalLog =
+                              message.includes('[App]') ||
+                              message.includes('[SessionReplayPlayer]') ||
+                              message.includes('Performance metrics sent') ||
+                              message.includes('Flushing') ||
+                              message.includes('buffered events');
+                            return !isInternalLog;
+                          }).length === 0 && (
+                              <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 py-12">
+                                <Terminal className="h-12 w-12 mb-3 opacity-50" />
+                                <p>No user console logs recorded</p>
+                                <p className="text-xs mt-1">(Internal logs filtered)</p>
+                              </div>
+                            )}
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">

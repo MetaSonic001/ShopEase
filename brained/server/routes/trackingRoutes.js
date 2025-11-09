@@ -18,16 +18,16 @@ router.post('/session', async (req, res) => {
     if (!sessionId) {
       return res.status(400).json({ message: 'sessionId is required' });
     }
-    
+
     if (!packedEvents || typeof packedEvents !== 'string' || packedEvents.length === 0) {
       return res.status(400).json({ message: 'packedEvents string is required and must not be empty' });
     }
-    
+
     console.log('[/session] Packed events validated. Length:', packedEvents.length);
 
     // Note: We don't block admin paths for manual recordings
     // Admin users may want to record their own sessions for testing
-    
+
     let session = await SessionRecording.findOne({ sessionId });
 
     if (!session) {
@@ -85,8 +85,8 @@ router.post('/session', async (req, res) => {
 
     await session.save();
 
-    res.json({ 
-      message: 'Session events recorded', 
+    res.json({
+      message: 'Session events recorded',
       sessionId: session.sessionId,
       packedChunksAdded: 1,
       totalChunks: session.events.length
@@ -211,7 +211,7 @@ router.get('/sessions', async (req, res) => {
         const bySession = new Map();
         const sigFor = (m) => (
           (m?.elementId && `#${m.elementId}`) ||
-          (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0,2).join('.')}`) ||
+          (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0, 2).join('.')}`) ||
           (m?.element && String(m.element).toLowerCase()) ||
           'unknown'
         );
@@ -317,7 +317,7 @@ router.get('/sessions/pages/available', async (req, res) => {
           entryURL: pageURL,
           events: { $exists: true, $ne: [] }
         });
-        
+
         // Get heatmap data counts
         const heatmapCounts = await HeatmapData.aggregate([
           { $match: { pageURL } },
@@ -650,9 +650,9 @@ router.get('/interactions/attention', async (req, res) => {
 
     // Below-the-fold detection: percent of interactions occurring after 50%
     const belowFoldScroll = bandStats.filter(b => b.from >= 50).reduce((s, b) => s + b.scrollHits, 0);
-    const totalScroll = bandStats.reduce((s,b)=> s + b.scrollHits, 0);
+    const totalScroll = bandStats.reduce((s, b) => s + b.scrollHits, 0);
     const belowFoldClicks = bandStats.filter(b => b.from >= 50).reduce((s, b) => s + b.clickHits, 0);
-    const totalClicks = bandStats.reduce((s,b)=> s + b.clickHits, 0);
+    const totalClicks = bandStats.reduce((s, b) => s + b.clickHits, 0);
     const belowTheFold = {
       scrollPercent: totalScroll ? parseFloat(((belowFoldScroll / totalScroll) * 100).toFixed(2)) : 0,
       clickPercent: totalClicks ? parseFloat(((belowFoldClicks / totalClicks) * 100).toFixed(2)) : 0,
@@ -691,16 +691,16 @@ router.get('/interactions/rage-clicks', async (req, res) => {
       .sort({ sessionId: 1, pageURL: 1, 'metadata.elementId': 1, timestamp: 1 })
       .lean();
 
-  const t = parseInt(threshold, 10) || 3;
-  const w = parseInt(windowMs, 10) || 3000;
-  const maxItems = parseInt(limit, 10) || 50;
+    const t = parseInt(threshold, 10) || 3;
+    const w = parseInt(windowMs, 10) || 3000;
+    const maxItems = parseInt(limit, 10) || 50;
 
     // Group by session + element signature
     const groups = new Map();
     const sigFor = (m) => {
       return (
         (m?.elementId && `#${m.elementId}`) ||
-        (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0,2).join('.')}`) ||
+        (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0, 2).join('.')}`) ||
         (m?.element && String(m.element).toLowerCase()) ||
         'unknown'
       );
@@ -788,9 +788,9 @@ router.get('/interactions/rage-clicks', async (req, res) => {
 // GET /api/tracking/interactions/dead-clicks?startDate&endDate&pageURL&idleMs=2000&limit=50
 router.get('/interactions/dead-clicks', async (req, res) => {
   try {
-  const { startDate, endDate, pageURL, idleMs = 2000, limit = 50 } = req.query;
-  const w = parseInt(idleMs, 10) || 2000;
-  const maxItems = parseInt(limit, 10) || 50;
+    const { startDate, endDate, pageURL, idleMs = 2000, limit = 50 } = req.query;
+    const w = parseInt(idleMs, 10) || 2000;
+    const maxItems = parseInt(limit, 10) || 50;
 
     const match = {};
     if (startDate || endDate) {
@@ -816,7 +816,7 @@ router.get('/interactions/dead-clicks', async (req, res) => {
     const results = [];
     const selectorOf = (m) => (
       (m?.elementId && `#${m.elementId}`) ||
-      (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0,2).join('.')}`) ||
+      (typeof m?.className === 'string' && `.${m.className.split(' ').slice(0, 2).join('.')}`) ||
       (m?.element && String(m.element).toLowerCase()) ||
       'unknown'
     );
@@ -983,7 +983,7 @@ router.get('/recording-status', async (req, res) => {
     // Check if there's an active recording in progress
     // This is stored in memory via Socket.IO, so we query global state
     const activeRecording = global.activeRecording || null;
-    
+
     if (activeRecording) {
       res.json({
         isRecording: true,
@@ -999,9 +999,9 @@ router.get('/recording-status', async (req, res) => {
     }
   } catch (error) {
     console.error('[RecordingStatus] Error checking status:', error);
-    res.status(500).json({ 
-      message: 'Failed to check recording status', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to check recording status',
+      error: error.message
     });
   }
 });
@@ -1013,12 +1013,87 @@ router.post('/save-recording', async (req, res) => {
 
     console.log(`[SaveRecording] Saving recording ${sessionId} with ${events?.length || 0} events`);
 
+    // Validate required fields
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required field: sessionId',
+      });
+    }
+
+    if (!events || !Array.isArray(events)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Events must be a non-empty array',
+      });
+    }
+
+    // Process events - remove __userId internal field and ensure proper format
+    // The model expects events as strings (for compression), but live recording sends objects
+    const processedEvents = events.map(event => {
+      const { __userId, ...cleanEvent } = event;
+
+      // If event is already a string, return as-is
+      if (typeof cleanEvent === 'string') {
+        return cleanEvent;
+      }
+
+      // Convert object to JSON string for storage
+      // (Live recordings send raw event objects, not compressed strings)
+      return JSON.stringify(cleanEvent);
+    });
+
+    // Calculate stats from events
+    let totalEvents = 0;
+    let totalClicks = 0;
+    let totalScrolls = 0;
+    let totalMoves = 0;
+
+    events.forEach(event => {
+      totalEvents++;
+
+      // Handle both object and string event formats
+      let eventData = event;
+      if (typeof event === 'string') {
+        try {
+          eventData = JSON.parse(event);
+        } catch (e) {
+          return;
+        }
+      }
+
+      // Count by event type (rrweb event types)
+      // Type 3 = IncrementalSnapshot (contains user interactions)
+      if (eventData.type === 3 && eventData.data) {
+        const source = eventData.data.source;
+
+        // Source 2 = MouseInteraction (includes clicks)
+        if (source === 2) {
+          const interactionType = eventData.data.type;
+          // Type 2 = MouseUp (click completion)
+          if (interactionType === 2) {
+            totalClicks++;
+          }
+        }
+
+        // Source 3 = Scroll
+        if (source === 3) {
+          totalScrolls++;
+        }
+
+        // Source 1 = MouseMove
+        if (source === 1) {
+          totalMoves++;
+        }
+      }
+    });
+
     // Create session recording
     const sessionRecording = new SessionRecording({
       sessionId,
       projectId: projectId || 'default',
       userId: metadata?.userId || 'anonymous',
-      events: events || [],
+      events: processedEvents,
       metadata: {
         ...metadata,
         recordingType: 'admin-triggered',
@@ -1030,6 +1105,12 @@ router.post('/save-recording', async (req, res) => {
           os: metadata?.os || 'unknown',
           screen: metadata?.screen || 'unknown',
         },
+      },
+      stats: {
+        totalEvents,
+        totalClicks,
+        totalScrolls,
+        totalMoves,
       },
       startTime: startTime || new Date(),
       endTime: endTime || new Date(),
@@ -1056,10 +1137,10 @@ router.post('/save-recording', async (req, res) => {
     if (metadata?.url) {
       try {
         const { regenerateHeatmapsForPage } = require('../services/heatmapAggregation');
-        
+
         // Trigger regeneration using the aggregation service
         const results = await regenerateHeatmapsForPage(metadata.url);
-        
+
         console.log(`[SaveRecording] Heatmap regeneration results:`, results);
       } catch (heatmapErr) {
         console.error('[SaveRecording] Error regenerating heatmaps:', heatmapErr);
